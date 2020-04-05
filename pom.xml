@@ -30,7 +30,7 @@
             <organization>Github</organization>
             <!-- URL for Organization, URL to your github profile work well here -->
             <organizationUrl>https://github.com/darkredz</organizationUrl>
-            <timezone>UTC+0:</timezone>
+            <timezone>UTC+08:00</timezone>
         </developer>
     </developers>
 
