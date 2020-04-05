@@ -4,7 +4,7 @@
 
     <groupId>io.zeko</groupId>
     <artifactId>zeko-sql-builder</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <packaging>jar</packaging>
 
     <name>${project.groupId}:${project.artifactId}</name>
