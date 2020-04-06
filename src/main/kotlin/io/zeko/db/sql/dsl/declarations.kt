@@ -242,6 +242,10 @@ infix fun String.inList(values: List<Any>):QueryBlock {
     return io.zeko.db.sql.operators.inList(this, values)
 }
 
+infix fun String.inList(values: Array<*>):QueryBlock {
+    return io.zeko.db.sql.operators.inList(this, values)
+}
+
 infix fun String.inList(valueSize: Int):QueryBlock {
     return io.zeko.db.sql.operators.inList(this, valueSize)
 }
@@ -254,14 +258,37 @@ infix fun String.notInList(values: List<Any>):QueryBlock {
     return io.zeko.db.sql.operators.notInList(this, values)
 }
 
+infix fun String.notInList(values: Array<*>):QueryBlock {
+    return io.zeko.db.sql.operators.notInList(this, values)
+}
+
 infix fun String.notInList(valueSize: Int):QueryBlock {
     return io.zeko.db.sql.operators.notInList(this, valueSize)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.and(value:QueryBlock): QueryBlock {
-    return io.zeko.db.sql.QueryBlock(this.toString(), " AND ", value.toString())
+infix fun QueryBlock.and(value: QueryBlock): QueryBlock {
+    return QueryBlock(this.toString(), " AND ", value.toString())
 }
 
-infix fun io.zeko.db.sql.QueryBlock.or(value:QueryBlock): QueryBlock {
-    return io.zeko.db.sql.QueryBlock(this.toString(), " OR ", value.toString())
+infix fun QueryBlock.or(value: QueryBlock): QueryBlock {
+    return QueryBlock(this.toString(), " OR ", value.toString())
 }
+
+infix fun String.between(values: Pair<*, *>): QueryBlock {
+    val value1 = values.first
+    if (value1 is String) {
+        val value2 = values.second.toString()
+        return io.zeko.db.sql.operators.between(this, value1, value2)
+    } else if (value1 is Int) {
+        val value2 = values.second as Int
+        return io.zeko.db.sql.operators.between(this, value1, value2)
+    } else if (value1 is Long) {
+        val value2 = values.second as Long
+        return io.zeko.db.sql.operators.between(this, value1, value2)
+    } else if (value1 is Double) {
+        val value2 = values.second as Double
+        return io.zeko.db.sql.operators.between(this, value1, value2)
+    }
+    return QueryBlock("", "")
+}
+
