@@ -218,16 +218,6 @@
         <sourceDirectory>src/main/kotlin</sourceDirectory>
         <testSourceDirectory>src/test/kotlin</testSourceDirectory>
 
-        <resources>
-            <resource>
-                <directory>${project.basedir}</directory>
-                <excludes>
-                    <exclude>docs</exclude>
-                    <exclude>examples</exclude>
-                </excludes>
-            </resource>
-        </resources>
-
         <plugins>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
