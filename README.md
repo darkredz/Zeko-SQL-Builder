@@ -1,7 +1,30 @@
 # Zeko SQL Builder
 ![alt Zeko SQL Builder](./logo.svg "Zeko lightweight SQL Builder")
 
-Zeko SQL Builder is a high-performance lightweight SQL library written for Kotlin language. It is designed to be flexible, portable, and fun to use. This library provides handy SQL wrapping DSL and a RDB client which is an abstraction on top on JDBC (currently supports HikariCP and Vert.x JDBC driver client)
+<p align="left">
+    <a href="https://search.maven.org/search?q=g:%22io.zeko%22">
+        <img src="https://img.shields.io/maven-central/v/io.zeko/zeko-sql-builder.svg?label=Maven%20Central" alt="Maven Central" />
+    </a>
+    <a href="LICENSE">
+        <img src="https://img.shields.io/badge/license-Apache%202-blue.svg?maxAge=2592000" alt="Apache License 2" />
+    </a>
+    <a href="https://github.com/KotlinBy/awesome-kotlin">
+        <img src="https://kotlin.link/awesome-kotlin.svg" alt="Awesome Kotlin Badge" />
+    </a>
+</p>
+
+Zeko SQL Builder is a high-performance lightweight SQL library written for Kotlin language. It is designed to be flexible, portable, and fun to use. This library provides handy SQL wrapping DSL and a RDB client which is an abstraction on top on JDBC (currently supports HikariCP and Vert.x JDBC driver client).
+
+This library is open source and available under the Apache 2.0 license. Please leave a star if you've found this library helpful!
+
+## Features
+- No configuration files, no XML, no YAML, no annotations, lightweight, easy to use
+- Fast startup & performance
+- No dependencies (Hikari-CP & Vert.x JDBC module is optional)
+- Flexible queries, gain control over the generated SQL as you wish
+- No implicit fetching. Just generating SQL through the DSL
+- No magic. No proxies, interceptors, reflections
+- No overheads, mainly string manipulation
 
 ## Getting Started
 This library is very easy-to-use. After reading this short documentation, you will have learnt enough.
