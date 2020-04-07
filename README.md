@@ -3,17 +3,19 @@
 
 Zeko SQL Builder is a high-performance lightweight SQL library written for Kotlin language. It is designed to be flexible, portable, and fun to use. This library provides handy SQL wrapping DSL and a RDB client which is an abstraction on top on JDBC (currently supports HikariCP and Vert.x JDBC driver client)
 
-##Getting Started
+## Getting Started
 This library is very easy-to-use. After reading this short documentation, you will have learnt enough.
 There's 3 kinds of flavour.
 
-###SQL Query Builder
+### SQL Query Builder
 The query builder dsl is currently supports standard ANSI sql which had been tested on database dialects
  such as PostgreSQL, MySQL, MariaDB, Apache Ignite and SQLite. 
  
+
+## Examples
 Simplest example, this only generates SQL without any database connection & execution.
 
-####Simple Query 
+#### Simple Query 
 ```kotlin
 import io.zeko.db.sql.Query
 
@@ -27,7 +29,7 @@ SELECT * FROM user
 SELECT id, name, age FROM user
 ```
 
-####Query DSL with where conditions and subquery
+#### Query DSL with where conditions and subquery
 ```kotlin
 import io.zeko.db.sql.Query
 
@@ -69,7 +71,7 @@ SELECT id, name, age FROM (SELECT * FROM user WHERE age < 50 LIMIT 10 OFFSET 0) 
 ```
 
 
-####Table Joins and aggregation functions
+#### Table Joins and aggregation functions
 ```kotlin
 Query().fields("*")
    .from("user")
@@ -105,8 +107,7 @@ SELECT * FROM user LEFT JOIN address ON (address.user_id = user.id )
 SELECT user.id as `user-id`, user.name as `user-name`, role.id as `role-id`, role.role_name as `role-role_name`, user.id as `role-user_id`, address.id as `address-id`, address.street1 as `address-street1`, address.street2 as `address-street2`, user.id as `address-user_id` FROM user LEFT JOIN address ON (address.user_id = user.id ) LEFT JOIN user_has_role ON (user_has_role.user_id = user.id ) LEFT JOIN role ON (role.id = user_has_role.role_id ) WHERE user.status > 0 OR user.id NOT IN (1,2,3) GROUP BY role.id, role.name HAVING SUM( role.id ) > 2 AND COUNT( role.id ) < 10 ORDER BY user.id ASC LIMIT 10 OFFSET 20
 ```
 
-
-####MySQL Fulltext search
+#### MySQL Fulltext search
 ```kotlin
 Query().fields("*").from("user").where("name" match "smit").toSql()
 Query().fields("*").from("user")
@@ -120,10 +121,47 @@ SELECT * FROM user WHERE MATCH( name ) AGAINST ( ? IN NATURAL LANGUAGE MODE )
 SELECT * FROM user WHERE MATCH( name,nickname ) AGAINST ( ? IN NATURAL LANGUAGE MODE )
 ```
 
-####Where expression
+## Different style of writing query
+#### Standard dsl
+```kotlin
+Query().fields("id", "name", "age")
+    .from("user")
+    .where(
+        "name" eq "Bat Man" and
+        ("id" greater 1) and
+        sub(("name" like "%bat") or ("name" like "man%")) and
+        ("nickname" isNotNull true)
+    ).toSql()
+```
+
+#### Static function call
+```kotlin
+Query().fields("id", "name", "age")
+    .from("user")
+    .where(
+        eq("name", "Bat Man"),
+        greater("id", 1),
+        sub(like("name", "%bat") or like("name", "man%")),
+        isNotNull("nickname")
+    ).toSql()
+```
+
+#### Raw strings
+```kotlin
+Query().fields("id", "name", "age")
+    .from("user")
+    .where(
+        "name = 'Bat Man'",
+        "id > 1",
+        "(name LIKE '%bat' OR name LIKE 'man%'",
+        "nickname IS NOT NULL"
+    ).toSql()
+```
+
+## Where Expression
 Query expression (where) allowed conditions are:
 ```
-eq - (==)
+eq - (=)
 neq - (!=)
 isNull()
 isNotNull()
@@ -142,7 +180,7 @@ match (MySQL MATCH AGAINST)
 sub - (This is use to group nested conditions)
 ```
 
-####Aggregation functions
+## Aggregation functions
 Query aggregation allowed functions are:
 ```
 sum()
@@ -174,11 +212,11 @@ maxLt()
 ```
 Or use agg(funcName, field, operator, value) to add in your desired aggregation function
 
-####More Examples
+## More Examples
 Look at the test cases for more [SQL code samples](https://github.com/darkredz/Zeko-SQL-Builder/tree/dev/src/test/kotlin/io/zeko/db/sql)
 
 
-####Query Dialects
+## Query Dialects
 The Query class is used for MySQL dialect by default. 
 To use it with other RDBMS such as Postgres, MariaDB and SQLite, you can use [ANSIQuery](https://github.com/darkredz/Zeko-SQL-Builder/blob/master/src/main/kotlin/io/zeko/db/sql/ANSIQuery.kt) instead of Query class.
 Or extend it to set your intended dialect column escape character.
@@ -186,11 +224,11 @@ Or extend it to set your intended dialect column escape character.
 Example: Apache Ignite query class - [IgniteQuery](https://github.com/darkredz/Zeko-SQL-Builder/blob/master/src/main/kotlin/io/zeko/db/sql/IgniteQuery.kt)
 
 
-##Download 
+## Download 
 
     <dependency>
       <groupId>io.zeko</groupId>
-      <artifactId>zeko-data-mapper</artifactId>
-      <version>1.5.10</version>
+      <artifactId>zeko-sql-builder</artifactId>
+      <version>1.0.3</version>
     </dependency>
     
