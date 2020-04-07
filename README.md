@@ -32,6 +32,8 @@ SELECT id, name, age FROM user
 #### Query DSL with where conditions and subquery
 ```kotlin
 import io.zeko.db.sql.Query
+import io.zeko.db.sql.dsl.*
+import io.zeko.db.sql.operators.*
 
 Query().fields("id", "name", "age")
     .from("user")
@@ -122,6 +124,8 @@ SELECT * FROM user WHERE MATCH( name,nickname ) AGAINST ( ? IN NATURAL LANGUAGE 
 ```
 
 ## Different style of writing query
+You can mixed all 3 together if needed.
+
 #### Standard dsl
 ```kotlin
 Query().fields("id", "name", "age")
@@ -223,12 +227,275 @@ Or extend it to set your intended dialect column escape character.
 
 Example: Apache Ignite query class - [IgniteQuery](https://github.com/darkredz/Zeko-SQL-Builder/blob/master/src/main/kotlin/io/zeko/db/sql/IgniteQuery.kt)
 
+## Database Connection
+Zeko SQL Builder provides a standard way to connect to your DB to execute the queries. 
+Currently the DB connection pool is an abstraction on top of HikariCP and Vert.x JDBC client module.
 
+## Creating DB Connection Pool and Session
+First create a HikariDBPool or VertxDBPool, you can refer to the [Vert.x JDBC client page](https://vertx.io/docs/vertx-jdbc-client/java/#_configuration) for the config. 
+These classes are using the same configuration properties but not necessarily dependant on the Vert.x module.
+
+The pool object can be wrap into a class as a singleton. 
+The connection pool and session are composed with suspend methods where you should be running them inside a coroutine.
+
+```kotlin
+import io.zeko.db.sql.connections.*
+import io.vertx.kotlin.core.json.json
+import io.vertx.kotlin.core.json.obj
+
+class DB {
+    private var pool: HikariDBPool
+
+    constructor() {
+        val mysqlConfig = json {
+            obj(
+                "url" to "jdbc:mysql://localhost:3306/zeko_test?user=root&password=12345",
+                "max_pool_size" to 30
+            )
+        }
+
+        pool = HikariDBPool(config)
+        // This is require if you want your Insert statement to return the newly inserted keys
+        pool.setInsertStatementMode(Statement.RETURN_GENERATED_KEYS)
+    }
+
+    suspend fun session(): DBSession {
+        val session = HikariDBSession(pool, pool.createConnection())
+        return session
+    }
+}
+```
+
+In your model code, you can call the DB instance you just created and start execute queries
+The once block will execute the query and then close the connection at the end of the block.
+```kotlin
+    suspend fun queryMe(statusFlag: Int) {
+        val sql = Query().fields("*").from("user").where("status" eq statusFlag).toSql()
+
+        db.session().once { conn ->
+            val result = conn.queryPrepared(sql, listOf(statusFlag)) as java.sql.ResultSet
+        }
+    }
+```
+If you are using VertxDBPool you should cast the result to as io.vertx.ext.sql.ResultSet
+
+#### Preprocess Result Rows
+The query method accepts a lambda where you can process the raw data map to the POJO/entity class you need.
+In this case User class is just a class with map delegate to its properties
+```kotlin
+class User(map: Map<String, Any?>) {
+    val defaultMap = map.withDefault { null }
+    val id: Int?     by defaultMap
+    val name: String? by defaultMap
+}
+
+suspend fun queryUsers(statusFlag: Int): List<User> {
+    lateinit var rows: List<User>
+    db.session().once { conn ->
+        val sql = "SELECT * FROM user WHERE status = ? ORDER BY id ASC"
+        rows = sess.queryPrepared(sql, listOf(1), { User(it) }) as List<User>
+    }
+}
+return rows
+```
+
+#### Retries
+The db session allows you to retry the same statements. 
+Calling retry(2) instead of once will execute the code block additional 2 times if it failed
+```kotlin
+    suspend fun queryMe(statusFlag: Int) {
+        val sql = Query().fields("*").from("user").where("status" eq statusFlag).toSql()
+
+        db.session().retry(2) { conn ->
+            val result = conn.queryPrepared(sql, listOf(statusFlag)) as java.sql.ResultSet
+        }
+    }
+```
+
+The retry can be delayed by passing a second parameter as miliseconds. This will delay 500ms before the retry will be executed
+```kotlin
+db.session().retry(2, 500) { conn ->
+    val result = conn.queryPrepared(sql, listOf(statusFlag)) as java.sql.ResultSet
+}
+```
+
+#### Transactions
+Transactions has the same parameters as retry(numRetries, delay), the only difference is the queries will be executed as a transaction block. 
+Any exceptions will result in a rollback automatically. Connection is closed as well at the end of the block.
+If you do not want the connection to be close, call transactionOpen instead.
+```kotlin
+db.session().transaction { conn ->
+    val result = conn.queryPrepared(sql, listOf(statusFlag)) as java.sql.ResultSet
+    val sqlInsert = """INSERT INTO user (name, email) VALUES (?, ?)"""
+    val ids = sess.insert(sqlInsert, arrayListOf(
+                    "User " + System.currentTimeMillis(),
+                    "abc@gmail.com"
+            )) as List<Int>
+}
+```
+
+The example insert returns a List of inserted IDs, this can only work if you have set beforehand:
+```kotlin
+pool.setInsertStatementMode(Statement.RETURN_GENERATED_KEYS)
+```
+Note: Not all database works with this, for instance Apache Ignite will throw exception since it does not support this SQL feature.
+
+#### More controls on connection
+To execute the queries with more control you can get the underlying connection object by calling rawConnection:
+```kotlin
+    val sess = db.session()
+    val conn = sess.rawConnection() as java.sql.Connection
+    // For Vert.x jdbc client, it will be:
+    // sess.rawConnection() as io.vertx.ext.sql.SQLConnection
+    
+    // Now you can do whatever you want, though the transaction{} block actually does this automatically
+    conn.autoCommit = false
+    lateinit var rows: List<User>
+
+    try {
+        val sql = "SELECT * FROM user" WHERE status = ? ORDER BY id ASC"
+        rows = sess.queryPrepared(sql, listOf(1), { User(it) }) as List<User>
+        conn.commit()
+    } catch (err: Exception) {
+        conn.rollback()
+    } finally {
+        conn.close()
+    }
+```
+
+## Data Mapper
+If you are using [Zeko Data Mapper](https://github.com/darkredz/Zeko-Data-Mapper), you can write code as below to automatically map the objects to nested entities.
+
+Example entities with User, Address and Role
+```kotlin
+class User(map: Map<String, Any?>) {
+    val defaultMap = map.withDefault { null }
+    val id: Int?     by defaultMap
+    val name: String? by defaultMap
+    val role_id: String? by defaultMap
+    val role: List<Role>? by defaultMap
+    val address: List<Address>? by defaultMap
+}
+
+class Address(map: Map<String, Any?>) {
+    val defaultMap = map.withDefault { null }
+    val id: Int?     by defaultMap
+    val user_id: Int? by defaultMap
+    val street1: String? by defaultMap
+    val street2: String? by defaultMap
+}
+
+class Role(map: Map<String, Any?>) {
+    val defaultMap = map.withDefault { null }
+    val id: Int?     by defaultMap
+    val role_name: String? by defaultMap
+    val user_id: Int? by defaultMap
+}
+```
+
+Execute join queries where User has address and has many roles
+```kotlin
+    import io.zeko.db.sql.Query
+    import io.zeko.db.sql.dsl.*
+    import io.zeko.db.sql.aggregations.*
+    import io.zeko.db.sql.operators.*
+    import io.zeko.model.declarations.toMaps
+    import io.zeko.model.DataMapper
+    import io.zeko.model.TableInfo
+
+    suspend fun mysqlQuery(): List<User> {
+        val query = Query()
+                .table("user").fields("id", "name")
+                .table("role").fields("id", "role_name", "user.id = user_id")
+                .table("address").fields("id", "street1", "street2", "user.id = user_id")
+                .from("user")
+                .leftJoin("address").on("user_id = user.id")
+                .leftJoin("user_has_role").on("user_id = user.id")
+                .leftJoin("role").on("id = user_has_role.role_id")
+                .where(
+                    between("user.id", 0, 1000)
+                )
+                .orderAsc("user.name")
+
+        val (sql, columns) = query.compile(true)
+
+        lateinit var rows: List<User>
+        db.session().once {
+            val result = it.query(sql, columns)
+            rows = DataMapper().mapStruct(structUserProfile(), result) as List<User>
+        }
+        return rows
+    }
+```
+
+```kotlin
+    fun structUserProfile(): LinkedHashMap<String, TableInfo> {
+        val tables = linkedMapOf<String, TableInfo>()
+        tables["user"] = TableInfo(key = "id", mapClass =  User::class.java)
+        tables["role"] = TableInfo(key = "id", mapClass =  Role::class.java, move_under = "user", foreign_key = "user_id", many_to_many = true, remove = listOf("user_id"))
+        tables["address"] = TableInfo(key = "id", mapClass =  Address::class.java, move_under = "user", foreign_key = "user_id", many_to_one = true, remove = listOf("user_id"))
+        return tables
+    }
+```
+Example output json encode
+```json
+[
+    {
+        "id": 3,
+        "name": "Joey",
+        "role": null,
+        "address": null
+    },
+    {
+        "id": 2,
+        "name": "John",
+        "role": [
+            {
+                "role_id": 1,
+                "type": "admin"
+            },
+            {
+                "role_id": 5,
+                "type": "super moderator"
+            }
+        ],
+        "address": [
+            {
+                "id": 2,
+                "street1": "Jalan Gembira",
+                "street2": "Taman OUG"
+            }
+        ]
+    },
+    {
+        "id": 1,
+        "name": "Bat Man",
+        "role": [
+            {
+                "role_id": 2,
+                "type": "super admin"
+            }
+        ],
+        "address": [
+            {
+                "id": 1,
+                "street1": "Jalan SS16/1",
+                "street2": "Taman Tun"
+            },
+            {
+                "id": 3,
+                "street1": "Jalan Bunga",
+                "street2": "Taman Negara"
+            }
+        ]
+    }
+]
+```
 ## Download 
 
     <dependency>
       <groupId>io.zeko</groupId>
       <artifactId>zeko-sql-builder</artifactId>
-      <version>1.0.3</version>
+      <version>1.0.4</version>
     </dependency>
     
