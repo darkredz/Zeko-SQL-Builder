@@ -28,10 +28,10 @@ This library is open source and available under the Apache 2.0 license. Please l
 
 ## Getting Started
 This library is very easy-to-use. After reading this short documentation, you will have learnt enough.
-There's 3 kinds of flavour.
+There's 3 kinds of flavours in writing queries with the library.
 
-### SQL Query Builder
-The query builder dsl is currently supports standard ANSI sql which had been tested on database dialects
+## SQL Query Builder
+The query builder dsl currently supports standard ANSI sql which had been tested on database dialects
  such as PostgreSQL, MySQL, MariaDB, Apache Ignite and SQLite. 
  
 
