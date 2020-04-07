@@ -121,12 +121,12 @@ class QueryParts {
     private fun buildWherePart(esp: String, espTableName: Boolean): String {
         var wherePart = ""
         where.forEach {
-            val s = " ${it.getStatement()} ${it.getOperator()} "
-            wherePart += linebreak + if (espTableName) escapeTableName(s) else s
+            val s = "${it.getStatement()} ${it.getOperator()} "
+            wherePart += linebreak + (if (espTableName) escapeTableName(s) else s).trimEnd()
         }
 
         if (wherePart != "") {
-            wherePart = linebreak + "WHERE " + wherePart.substring(0, wherePart.length - 4)
+            wherePart = linebreak + "WHERE" + wherePart.substring(0, wherePart.length - 3).replace("  ", " ")
         }
         return wherePart
     }
@@ -151,12 +151,12 @@ class QueryParts {
     private fun buildHavingPart(esp: String, espTableName: Boolean): String {
         var havingPart = ""
         havings.forEach {
-            val s = " ${it.getStatement()} ${it.getOperator()} "
-            havingPart += linebreak + if (espTableName) escapeTableName(s) else s
+            val s = "${it.getStatement()} ${it.getOperator()} "
+            havingPart += linebreak + (if (espTableName) escapeTableName(s) else s).trimEnd()
         }
 
         if (havingPart != "") {
-            havingPart = linebreak + "HAVING " + havingPart.substring(0, havingPart.length - 4)
+            havingPart = linebreak + "HAVING" + havingPart.substring(0, havingPart.length - 3).replace("  ", " ")
         }
         return havingPart
     }
@@ -190,6 +190,11 @@ class QueryParts {
         val orderPart = buildOrderByPart(esp, espTableName)
         val limitPart = buildLimitOffsetPart(esp, espTableName)
 
-        return """SELECT $sqlFields FROM $fromPart $joinsPart $wherePart $groupByPart $havingPart $orderPart $limitPart""".trimEnd()
+        var parts = ""
+        arrayOf(fromPart, joinsPart, wherePart, groupByPart, havingPart, orderPart, limitPart).forEach {
+            val p = it.trim()
+            if (p != "") parts += "$p "
+        }
+        return """SELECT $sqlFields FROM $parts""".trimEnd()
     }
 }

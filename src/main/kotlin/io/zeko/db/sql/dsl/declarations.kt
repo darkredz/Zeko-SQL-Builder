@@ -234,35 +234,35 @@ infix fun String.isNull(value: Boolean): QueryBlock {
     return io.zeko.db.sql.QueryBlock("", "")
 }
 
-infix fun String.inList(values: String):QueryBlock {
+infix fun String.inList(values: String): QueryBlock {
     return io.zeko.db.sql.operators.inList(this, values)
 }
 
-infix fun String.inList(values: List<Any>):QueryBlock {
+infix fun String.inList(values: List<Any>): QueryBlock {
     return io.zeko.db.sql.operators.inList(this, values)
 }
 
-infix fun String.inList(values: Array<*>):QueryBlock {
+infix fun String.inList(values: Array<*>): QueryBlock {
     return io.zeko.db.sql.operators.inList(this, values)
 }
 
-infix fun String.inList(valueSize: Int):QueryBlock {
+infix fun String.inList(valueSize: Int): QueryBlock {
     return io.zeko.db.sql.operators.inList(this, valueSize)
 }
 
-infix fun String.notInList(values: String):QueryBlock {
+infix fun String.notInList(values: String): QueryBlock {
     return io.zeko.db.sql.operators.notInList(this, values)
 }
 
-infix fun String.notInList(values: List<Any>):QueryBlock {
+infix fun String.notInList(values: List<Any>): QueryBlock {
     return io.zeko.db.sql.operators.notInList(this, values)
 }
 
-infix fun String.notInList(values: Array<*>):QueryBlock {
+infix fun String.notInList(values: Array<*>): QueryBlock {
     return io.zeko.db.sql.operators.notInList(this, values)
 }
 
-infix fun String.notInList(valueSize: Int):QueryBlock {
+infix fun String.notInList(valueSize: Int): QueryBlock {
     return io.zeko.db.sql.operators.notInList(this, valueSize)
 }
 

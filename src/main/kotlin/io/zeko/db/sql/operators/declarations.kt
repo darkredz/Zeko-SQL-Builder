@@ -238,3 +238,7 @@ fun notInList(stmt: String, values: Array<*>): QueryBlock {
 fun sub(value: QueryBlock) : QueryBlock {
     return QueryBlock("( ", value.toString(), " )")
 }
+
+fun sub(value: String) : QueryBlock {
+    return QueryBlock("( ", value, " )")
+}
