@@ -287,6 +287,20 @@ open class Query {
         return this
     }
 
+    fun where(vararg blocks: Any): Query {
+        (blocks as Array<Any>).forEach {
+            whereCondition.add(And(it.toString()))
+        }
+        return this
+    }
+
+    fun where(vararg blocks: String): Query {
+        (blocks as Array<String>).forEach {
+            whereCondition.add(And(it))
+        }
+        return this
+    }
+
     fun where(queryBlock: QueryBlock, useOr: Boolean = false): Query {
         return where(queryBlock.toString(), useOr)
     }
@@ -432,6 +446,14 @@ open class Query {
         return this
     }
 
+
+    fun order(vararg fields: String): Query {
+        return order(listOf(*fields))
+    }
+
+    fun order(vararg fields: Sort): Query {
+        return order(listOf(*fields))
+    }
 
     fun order(field: String, useDesc: Boolean = false): Query {
         if (useDesc) {
