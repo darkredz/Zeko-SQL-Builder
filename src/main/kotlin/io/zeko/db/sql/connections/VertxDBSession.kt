@@ -1,7 +1,6 @@
 package io.zeko.db.sql.connections
 
 import io.zeko.model.declarations.toMaps
-import io.vertx.core.Vertx
 import io.vertx.core.json.JsonArray
 import io.vertx.ext.sql.SQLConnection
 import io.vertx.ext.sql.UpdateResult
@@ -18,7 +17,7 @@ class VertxDBSession : DBSession {
     var dbPool: DBPool
     var rawConn: SQLConnection
 
-    constructor(vertx: Vertx, dbPool: DBPool, conn: DBConn) {
+    constructor(dbPool: DBPool, conn: DBConn) {
         this.dbPool = dbPool
         this.conn = conn
         rawConn = conn.raw() as SQLConnection

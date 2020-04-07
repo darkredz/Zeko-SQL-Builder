@@ -2,21 +2,17 @@ package io.zeko.db.sql.connections
 
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
-import io.vertx.core.Vertx
 import io.vertx.core.json.JsonObject
 
 class HikariDBPool : DBPool {
     private lateinit var ds: HikariDataSource
-    private var vertx: Vertx
     private var insertStatementMode: Int = -1
 
-    constructor(vertx: Vertx, json: JsonObject) {
-        this.vertx = vertx
+    constructor(json: JsonObject) {
         init(json)
     }
 
-    constructor(vertx: Vertx, config: HikariConfig) {
-        this.vertx = vertx
+    constructor(config: HikariConfig) {
         init(config)
     }
 
