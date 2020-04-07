@@ -1,7 +1,7 @@
 # Zeko SQL Builder
 ![alt Zeko SQL Builder](./logo.svg "Zeko lightweight SQL Builder")
 
-<p align="center">
+<p align="left">
     <a href="https://search.maven.org/search?q=g:%22io.zeko%22">
         <img src="https://img.shields.io/maven-central/v/io.zeko/zeko-sql-builder.svg?label=Maven%20Central" alt="Maven Central" />
     </a>
