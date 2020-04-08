@@ -239,6 +239,18 @@ maxLt()
 ```
 Or use agg(funcName, field, operator, value) to add in your desired aggregation function
 
+#### Add your own aggregation functions
+```kotlin
+// Postgres square of the correlation coefficient
+fun regr_r2(field: String, value: Double)): QueryBlock {
+    return agg("regr_r2", field, "=", value)
+}
+
+fun regr_r2_gt(field: String, value: Double)): QueryBlock {
+    return agg("regr_r2", field, ">", value)
+}
+```
+
 ## More Examples
 Look at the test cases for more [SQL code samples](https://github.com/darkredz/Zeko-SQL-Builder/tree/dev/src/test/kotlin/io/zeko/db/sql)
 
