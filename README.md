@@ -350,7 +350,7 @@ If you do not want the connection to be close, call transactionOpen instead.
 db.session().transaction { conn ->
     val result = conn.queryPrepared(sql, listOf(statusFlag)) as java.sql.ResultSet
     val sqlInsert = """INSERT INTO user (name, email) VALUES (?, ?)"""
-    val ids = sess.insert(sqlInsert, arrayListOf(
+    val ids = conn.insert(sqlInsert, arrayListOf(
                     "User " + System.currentTimeMillis(),
                     "abc@gmail.com"
             )) as List<Int>
@@ -376,7 +376,7 @@ To execute the queries with more control you can get the underlying connection o
     lateinit var rows: List<User>
 
     try {
-        val sql = "SELECT * FROM user" WHERE status = ? ORDER BY id ASC"
+        val sql = "SELECT * FROM user WHERE status = ? ORDER BY id ASC"
         rows = sess.queryPrepared(sql, listOf(1), { User(it) }) as List<User>
         conn.commit()
     } catch (err: Exception) {
