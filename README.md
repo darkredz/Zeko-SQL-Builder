@@ -20,12 +20,13 @@ This library is open source and available under the Apache 2.0 license. Please l
 ## Features
 - No configuration files, no XML, no YAML, no annotations, lightweight, easy to use
 - Fast startup & performance
-- No dependencies (Hikari-CP & Vert.x JDBC module is optional)
+- No dependencies ([Hikari-CP](https://github.com/brettwooldridge/HikariCP) & [Vert.x JDBC module](https://vertx.io/docs/vertx-jdbc-client/kotlin/) is optional)
 - Flexible queries, gain control over the generated SQL as you wish
 - No implicit fetching. Just generating SQL through the DSL
 - No magic. No proxies, interceptors, reflections
 - No overheads, mainly string manipulation
-
+- Extensible, [add your own extensions](#custom-Extensions) to support more operators, database dialects, SQL functions
+ 
 ## Getting Started
 This library is very easy-to-use. After reading this short documentation, you will have learnt enough.
 There's 3 kinds of flavours in writing queries with the library.
@@ -140,16 +141,28 @@ Query().fields("*").from("user")
     .toSql()
 ```
 
+#### Unions
+```kotlin
+import io.zeko.db.sql.extensions.common.*
+
+Query().fields("id", "name").from("user")
+    .where("name" eq "Leng")
+    .union(
+        Query().fields("id", "first_name").from("customer")
+    )
+    .order("first_name")
+    .toSql()
+```
+
 Outputs
 ```sql
-SELECT * FROM user WHERE MATCH( name ) AGAINST ( ? IN NATURAL LANGUAGE MODE )
-SELECT * FROM user WHERE MATCH( name,nickname ) AGAINST ( ? IN NATURAL LANGUAGE MODE )
+SELECT id, name FROM user WHERE name = ? UNION ( SELECT id, first_name FROM customer ) ORDER BY first_name ASC
 ```
 
 ## Different style of writing query
 You can mixed all 3 together if needed.
 
-#### Standard dsl
+#### Standard DSL
 ```kotlin
 Query().fields("id", "name", "age")
     .from("user")
@@ -251,9 +264,37 @@ fun regr_r2_gt(field: String, value: Double)): QueryBlock {
 }
 ```
 
+## Custom Extensions
+You can add your own custom queries extensions for you desired database dialects. 
+It is made simple and possible in Kotlin language. 
+
+For example, you can add in FOR UPDATE statements which is used in MySQL by simply defining a method extension in your package and import to use it.
+```kotlin
+fun Query.forUpdate(): Query {
+    // Adds query block after LIMIT section
+    this.addExpressionAfter(CustomPart.LIMIT, QueryBlock("FOR UPDATE"))
+    return this
+}
+
+Query().fields("*").from("user")
+    .where("name" eq "Leng")
+    .limit(1)
+    .forUpdate()
+    .toSql()
+
+// Outputs: SELECT * FROM user WHERE name = ? LIMIT 1 OFFSET 0 FOR UPDATE
+```
+
+Available SQL section for customization are defined at [CustomPart enum class](https://github.com/darkredz/Zeko-SQL-Builder/blob/master/src/main/kotlin/io/zeko/db/sql/CustomPart.kt)
+```
+    SELECT, FIELD, FROM, JOIN, WHERE, GROUP_BY, HAVING, ORDER, LIMIT
+```
+
+For more examples such as [UNION](https://github.com/darkredz/Zeko-SQL-Builder/blob/master/src/main/kotlin/io/zeko/db/sql/extensions/common/declarations.kt#L18) refer to the [predefined extensions source code](https://github.com/darkredz/Zeko-SQL-Builder/blob/master/src/main/kotlin/io/zeko/db/sql/extensions/common/declarations.kt)
+and the test cases for [custom extensions](https://github.com/darkredz/Zeko-SQL-Builder/blob/master/src/test/kotlin/io/zeko/db/sql/QueryCustomExpressionSpec.kt)
+
 ## More Examples
 Look at the test cases for more [SQL code samples](https://github.com/darkredz/Zeko-SQL-Builder/tree/dev/src/test/kotlin/io/zeko/db/sql)
-
 
 ## Query Dialects
 The Query class is used for MySQL dialect by default. 
@@ -264,7 +305,7 @@ Example: Apache Ignite query class - [IgniteQuery](https://github.com/darkredz/Z
 
 ## Database Connection
 Zeko SQL Builder provides a standard way to connect to your DB to execute the queries. 
-Currently the DB connection pool is an abstraction on top of HikariCP and Vert.x JDBC client module.
+Currently the DB connection pool is an abstraction on top of [HikariCP](https://github.com/brettwooldridge/HikariCP) and Vert.x JDBC client module.
 
 ## Creating DB Connection Pool and Session
 First create a HikariDBPool or VertxDBPool, you can refer to the [Vert.x JDBC client page](https://vertx.io/docs/vertx-jdbc-client/java/#_configuration) for the config. 
@@ -531,6 +572,6 @@ Example output json encode
     <dependency>
       <groupId>io.zeko</groupId>
       <artifactId>zeko-sql-builder</artifactId>
-      <version>1.0.4</version>
+      <version>1.0.5</version>
     </dependency>
     
