@@ -16,6 +16,10 @@ open class QueryBlock {
         this.right = right
     }
 
+    constructor(center: String) {
+        this.center = center
+    }
+
     open fun getStatement(): String = "$left $center $right"
 
     override fun toString(): String {

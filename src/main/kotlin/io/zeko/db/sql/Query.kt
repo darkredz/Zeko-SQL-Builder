@@ -1,13 +1,8 @@
 package io.zeko.db.sql
 
-import io.vertx.core.json.JsonObject
-import io.vertx.kotlin.core.json.json
-import io.vertx.kotlin.core.json.jsonArrayOf
-import io.vertx.kotlin.core.json.obj
-import java.util.ArrayList
-import java.util.LinkedHashMap
+import java.util.*
+import kotlin.collections.ArrayList
 
-data class SelectPart(val columns: List<String>, val sqlFields: String)
 
 open class Query {
     var espChar: String
@@ -43,6 +38,10 @@ open class Query {
 
     private val orderBy by lazy {
         arrayListOf<Sort>()
+    }
+
+    private val expression by lazy {
+        EnumMap<CustomPart, List<QueryBlock>>(CustomPart::class.java)
     }
 
     private var limitOffset: Array<Int>? = null
@@ -111,28 +110,34 @@ open class Query {
         return SelectPart(columns, sqlFields)
     }
 
-    fun toJson(): JsonObject {
-        val selection = json {
-            obj(
-                    "SELECT" to fieldsToSelect,
-                    "FROM" to tableFrom,
-                    "JOINS" to obj(tableToJoin),
-                    "WHERE" to jsonArrayOf(whereCondition),
-                    "ORDER_BY" to jsonArrayOf(orderBy),
-                    "GROUP_BY" to jsonArrayOf(groupBys),
-                    "HAVING" to jsonArrayOf(havingCondition),
-                    "LIMIT" to jsonArrayOf(limitOffset)
-            )
-        }
-        return selection
-    }
-
     fun toParts(shouldLineBreak: Boolean = false): QueryParts {
-        val parts = QueryParts(this, fieldsToSelect, tableFrom, tableToJoin, whereCondition, orderBy, limitOffset, groupBys, havingCondition)
+        val parts = QueryParts(this, fieldsToSelect, tableFrom, tableToJoin, whereCondition, orderBy, limitOffset, groupBys, havingCondition, expression)
         if (shouldLineBreak) {
             parts.linebreak = "\n"
         }
         return parts
+    }
+
+    fun addExpressionAfter(type: CustomPart, block: QueryBlock) {
+        if (this.expression.containsKey(type)) {
+            (this.expression[type] as ArrayList).add(block)
+        } else {
+            this.expression[type] = arrayListOf(block)
+        }
+    }
+
+    fun precompile(shouldLineBreak: Boolean = false): Array<String> {
+        val selectPart = compileSelect()
+        val parts = toParts(shouldLineBreak)
+        return parts.precompile()
+    }
+
+    fun compile(processor: (Array<String>) -> String, shouldLineBreak: Boolean = false): QueryInfo {
+        val selectPart = compileSelect()
+        val parts = toParts(shouldLineBreak)
+        val partsArr = parts.precompile()
+        val sql = processor(partsArr)
+        return QueryInfo(sql, selectPart.columns, selectPart.sqlFields, parts)
     }
 
     fun compile(shouldLineBreak: Boolean = false): QueryInfo {

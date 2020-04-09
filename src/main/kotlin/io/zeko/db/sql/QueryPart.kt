@@ -1,7 +1,7 @@
 package io.zeko.db.sql
 
-import java.util.ArrayList
-import java.util.LinkedHashMap
+import java.util.*
+import kotlin.collections.HashMap
 
 data class QueryInfo(val sql: String, val columns: List<String>, val sqlFields: String, val parts: QueryParts)
 
@@ -23,6 +23,7 @@ class QueryParts {
     var havings: List<Condition>
     var order: List<Sort>
     var limit: Array<Int>?
+    var custom: EnumMap<CustomPart, List<QueryBlock>>
 
     constructor(
             query:Query,
@@ -33,7 +34,8 @@ class QueryParts {
             order: List<Sort>,
             limit: Array<Int>?,
             groupBys: List<String>,
-            havingCondition: List<Condition>
+            havingCondition: List<Condition>,
+            customExpression: EnumMap<CustomPart, List<QueryBlock>>
     ) {
         this.fields = fields
         this.query = query
@@ -44,6 +46,7 @@ class QueryParts {
         this.limit = limit
         this.groupBys = groupBys
         this.havings = havingCondition
+        this.custom = customExpression
     }
 
     private fun escapeTableName(statement: String): String {
@@ -177,7 +180,7 @@ class QueryParts {
     private fun buildLimitOffsetPart(esp: String, espTableName: Boolean): String =
             linebreak + if (limit != null) "LIMIT ${limit!![0]} OFFSET ${limit!![1]} " else ""
 
-    fun compile(): String {
+    fun precompile(): Array<String> {
         val (columns, sqlFields) = query.compileSelect()
         val esp = query.espChar
         val espTableName = query.espTableName
@@ -190,11 +193,50 @@ class QueryParts {
         val orderPart = buildOrderByPart(esp, espTableName)
         val limitPart = buildLimitOffsetPart(esp, espTableName)
 
+        return arrayOf(sqlFields, fromPart, joinsPart, wherePart, groupByPart, havingPart, orderPart, limitPart)
+    }
+
+    fun compile(): String {
+        val allParts = precompile()
+        val sqlFields = allParts[0]
+        val others = allParts.slice(1 until allParts.size)
+
+        val customParts = CustomPart.values()
+        val partNames = customParts.slice(2 until customParts.size)
         var parts = ""
-        arrayOf(fromPart, joinsPart, wherePart, groupByPart, havingPart, orderPart, limitPart).forEach {
-            val p = it.trim()
+
+        others.forEachIndexed { idx, s ->
+            val p = s.trim()
             if (p != "") parts += "$p "
+
+            if (custom.containsKey(partNames[idx])) {
+                val blocks = custom[partNames[idx]]
+                blocks?.forEach {
+                    parts += it.toString().trim() + " "
+                }
+            }
         }
-        return """SELECT $sqlFields FROM $parts""".trimEnd()
+
+        var sql = "SELECT "
+        if (custom.containsKey(CustomPart.SELECT)) {
+            val blocks = custom[CustomPart.SELECT]
+            blocks?.forEach {
+                sql += "$it "
+            }
+            sql = sql.replace("  ", " ")
+        }
+
+        sql += "$sqlFields "
+
+        if (custom.containsKey(CustomPart.FIELD)) {
+            val blocks = custom[CustomPart.SELECT]
+            blocks?.forEach {
+                sql += "$it "
+            }
+            sql = sql.replace("  ", " ")
+        }
+
+        sql = sql.trimEnd()
+        return """$sql FROM $parts""".trimEnd()
     }
 }
