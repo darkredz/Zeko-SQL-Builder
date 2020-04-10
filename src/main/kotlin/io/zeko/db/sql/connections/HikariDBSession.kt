@@ -1,7 +1,6 @@
 package io.zeko.db.sql.connections
 
 import io.zeko.model.declarations.toMaps
-import io.vertx.core.Vertx
 import kotlinx.coroutines.delay
 import org.joda.time.LocalDateTime
 import java.io.InputStream
@@ -23,7 +22,7 @@ open class HikariDBSession : DBSession {
     var dbPool: DBPool
     var rawConn: Connection
 
-    constructor(vertx: Vertx, dbPool: DBPool, conn: DBConn) {
+    constructor(dbPool: DBPool, conn: DBConn) {
         this.dbPool = dbPool
         this.conn = conn
         rawConn = conn.raw() as Connection
