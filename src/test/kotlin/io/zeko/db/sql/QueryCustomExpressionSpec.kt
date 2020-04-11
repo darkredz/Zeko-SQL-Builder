@@ -1,9 +1,6 @@
 package io.zeko.db.sql
 
 import io.zeko.db.sql.dsl.*
-import io.zeko.db.sql.operators.eq
-import io.zeko.db.sql.operators.like
-import io.zeko.db.sql.operators.sub
 import org.spekframework.spek2.Spek
 import org.spekframework.spek2.style.specification.describe
 import kotlin.test.assertEquals
