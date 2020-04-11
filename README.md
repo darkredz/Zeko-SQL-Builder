@@ -572,6 +572,6 @@ Example output json encode
     <dependency>
       <groupId>io.zeko</groupId>
       <artifactId>zeko-sql-builder</artifactId>
-      <version>1.0.5</version>
+      <version>1.0.6</version>
     </dependency>
     
