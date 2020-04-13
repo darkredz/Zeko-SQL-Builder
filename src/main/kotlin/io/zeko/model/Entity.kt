@@ -17,4 +17,12 @@ abstract class Entity {
     open fun tableName(): String = ""
 
     open fun dataMap(): MutableMap<String, Any?> = map
+
+    override fun toString(): String {
+        var str = this.tableName() + " { "
+        dataMap().entries.forEach {
+            str += "${it.key}-> ${it.value}, "
+        }
+        return str.removeSuffix(", ") + " }"
+    }
 }
