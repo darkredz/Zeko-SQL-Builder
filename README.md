@@ -416,6 +416,57 @@ pool.setInsertStatementMode(Statement.RETURN_GENERATED_KEYS)
 ```
 Note: Not all database works with this, for instance Apache Ignite will throw exception since it does not support this SQL feature.
 
+#### Insert, Update and Delete statements
+Zeko sql builder only supports DML at the moment. To build any insert, update and delete statement, you have to create an Entity class for your table.
+
+```kotlin
+import io.zeko.model.Entity
+
+class User : Entity {
+    constructor(map: Map<String, Any?>) : super(map)
+    constructor(vararg props: Pair<String, Any?>) : super(*props)
+    var id: Int?     by map
+    var age: Int?     by map
+    var name: String? by map
+    var role_id: String? by map
+    var role: List<Role>? by map
+    var address: List<Address>? by map
+}
+```
+Generate SQL, for more [examples refer to the test cases](https://github.com/darkredz/Zeko-SQL-Builder/blob/master/src/test/kotlin/io/zeko/db/sql/UpdateStatementSpec.kt)
+```kotlin
+Update(User("id" to 1, "name" to "O'Connor")).toSql()
+// UPDATE users SET id = 1, name = 'O''Connor'
+
+Insert(User().apply {
+    name = "Leng"
+    age = 21
+}).toSql()
+// INSERT INTO user ( name, age ) VALUES ( 'Leng', 21 )
+
+Update(User().apply {
+    name = "Leng"
+}).where(
+    "id" greater 100,
+    "age" eq 60
+).toSql()
+// UPDATE users SET name = 'Leng' WHERE id > 100 AND age = 60
+
+Insert(User(), "id", "name").select(
+    Query().fields("user_id", "fullname")
+            .from("customer")
+            .where("status" eq 0)
+).toSql()
+// INSERT INTO users ( id, name ) SELECT user_id, fullname FROM customer WHERE status = 0
+
+ Delete(User()).where(
+    "id" greater 100,
+    "age" less 80,
+    "name" eq "Leng"
+).toSql()
+// DELETE FROM users WHERE id > 100 AND age < 80 AND name = ?
+```
+
 #### More controls on connection
 To execute the queries with more control you can get the underlying connection object by calling rawConnection:
 ```kotlin
@@ -444,28 +495,31 @@ If you are using [Zeko Data Mapper](https://github.com/darkredz/Zeko-Data-Mapper
 
 Example entities with User, Address and Role
 ```kotlin
-class User(map: Map<String, Any?>) {
-    val defaultMap = map.withDefault { null }
-    val id: Int?     by defaultMap
-    val name: String? by defaultMap
-    val role_id: String? by defaultMap
-    val role: List<Role>? by defaultMap
-    val address: List<Address>? by defaultMap
+import io.zeko.model.Entity
+
+class User : Entity {
+    constructor(map: Map<String, Any?>) : super(map)
+    var id: Int?     by map
+    var age: Int?     by map
+    var name: String? by map
+    var role_id: String? by map
+    var role: List<Role>? by map
+    var address: List<Address>? by map
 }
 
-class Address(map: Map<String, Any?>) {
-    val defaultMap = map.withDefault { null }
-    val id: Int?     by defaultMap
-    val user_id: Int? by defaultMap
-    val street1: String? by defaultMap
-    val street2: String? by defaultMap
+class Address : Entity {
+    constructor(map: MutableMap<String, Any?>) : super(map)
+    var id: Int? by map
+    var user_id: Int? by map
+    var street1: String? by map
+    var street2: String? by map
 }
 
-class Role(map: Map<String, Any?>) {
-    val defaultMap = map.withDefault { null }
-    val id: Int?     by defaultMap
-    val role_name: String? by defaultMap
-    val user_id: Int? by defaultMap
+class Role : Entity {
+    constructor(map: MutableMap<String, Any?>) : super(map)
+    var id: Int?     by map
+    var role_name: String? by map
+    var user_id: Int? by map
 }
 ```
 
@@ -572,6 +626,6 @@ Example output json encode
     <dependency>
       <groupId>io.zeko</groupId>
       <artifactId>zeko-sql-builder</artifactId>
-      <version>1.0.6</version>
+      <version>1.0.7</version>
     </dependency>
     
