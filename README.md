@@ -561,9 +561,9 @@ Execute join queries where User has address and has many roles
 ```kotlin
     fun structUserProfile(): LinkedHashMap<String, TableInfo> {
         val tables = linkedMapOf<String, TableInfo>()
-        tables["user"] = TableInfo(key = "id", mapClass =  User::class.java)
-        tables["role"] = TableInfo(key = "id", mapClass =  Role::class.java, move_under = "user", foreign_key = "user_id", many_to_many = true, remove = listOf("user_id"))
-        tables["address"] = TableInfo(key = "id", mapClass =  Address::class.java, move_under = "user", foreign_key = "user_id", many_to_one = true, remove = listOf("user_id"))
+        tables["user"] = TableInfo(key = "id", dataClassHandler = { User(it) })
+        tables["role"] = TableInfo(key = "id", dataClassHandler = { Role(it) }, move_under = "user", foreign_key = "user_id", many_to_many = true, remove = listOf("user_id"))
+        tables["address"] = TableInfo(key = "id", dataClassHandler = { Address(it) }, move_under = "user", foreign_key = "user_id", many_to_one = true, remove = listOf("user_id"))
         return tables
     }
 ```
