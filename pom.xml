@@ -144,9 +144,19 @@
             <version>${vertx.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.github.darkredz</groupId>
+            <groupId>com.github.jasync-sql</groupId>
+            <artifactId>jasync-postgresql</artifactId>
+            <version>1.0.14</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.jasync-sql</groupId>
+            <artifactId>jasync-mysql</artifactId>
+            <version>1.0.14</version>
+        </dependency>
+        <dependency>
+            <groupId>io.zeko</groupId>
             <artifactId>zeko-data-mapper</artifactId>
-            <version>1.5.9</version>
+            <version>1.6.0</version>
         </dependency>
         <dependency>
             <groupId>com.zaxxer</groupId>
