@@ -20,7 +20,7 @@ This library is open source and available under the Apache 2.0 license. Please l
 ## Features
 - No configuration files, no XML, no YAML, no annotations, lightweight, easy to use
 - Fast startup & performance
-- No dependencies ([Hikari-CP](https://github.com/brettwooldridge/HikariCP) & [Vert.x JDBC module](https://vertx.io/docs/vertx-jdbc-client/kotlin/) is optional)
+- No dependencies ([Jasync SQL](https://github.com/jasync-sql/jasync-sql), [Hikari-CP](https://github.com/brettwooldridge/HikariCP) & [Vert.x JDBC module](https://vertx.io/docs/vertx-jdbc-client/kotlin/) are optional)
 - Flexible queries, gain control over the generated SQL as you wish
 - No implicit fetching. Just generating SQL through the DSL
 - No magic. No proxies, interceptors, reflections
@@ -359,8 +359,11 @@ Zeko SQL Builder provides a standard way to connect to your DB to execute the qu
 Currently the DB connection pool is an abstraction on top of [HikariCP](https://github.com/brettwooldridge/HikariCP) and Vert.x JDBC client module.
 
 ## Creating DB Connection Pool and Session
-First create a HikariDBPool or VertxDBPool, you can refer to the [Vert.x JDBC client page](https://vertx.io/docs/vertx-jdbc-client/java/#_configuration) for the config. 
-These classes are using the same configuration properties but not necessarily dependant on the Vert.x module.
+First create a JasyncDBPool, HikariDBPool or VertxDBPool, you can refer to the [Vert.x JDBC client page](https://vertx.io/docs/vertx-jdbc-client/java/#_configuration) for the config. 
+These classes are using the same configuration properties but not necessarily dependant on the Vert.x module. 
+
+JasyncDBPool will automatically parse the jdbc url to populate the pool configuration if a JsonObject is passed with url field so you don't have to. 
+You could still pass in a [ConnectionPoolConfigurationBuilder](https://github.com/jasync-sql/jasync-sql/wiki/Configuring-and-Managing-Connections) to its constructor for more control.
 
 The pool object can be wrap into a class as a singleton. 
 The connection pool and session are composed with suspend methods where you should be running them inside a coroutine.
@@ -372,6 +375,7 @@ import io.vertx.kotlin.core.json.obj
 
 class DB {
     private var pool: HikariDBPool
+    private var pool2: JasyncDBPool
 
     constructor() {
         val mysqlConfig = json {
@@ -384,12 +388,11 @@ class DB {
         pool = HikariDBPool(config)
         // This is require if you want your Insert statement to return the newly inserted keys
         pool.setInsertStatementMode(Statement.RETURN_GENERATED_KEYS)
+        pool2 = JasyncDBPool(config)
     }
 
-    suspend fun session(): DBSession {
-        val session = HikariDBSession(pool, pool.createConnection())
-        return session
-    }
+    suspend fun session(): DBSession = HikariDBSession(pool, pool.createConnection())
+    suspend fun session2(): DBSession = JasyncDBSession(pool2, pool2.createConnection())
 }
 ```
 
@@ -405,6 +408,7 @@ The once block will execute the query and then close the connection at the end o
     }
 ```
 If you are using VertxDBPool you should cast the result to as io.vertx.ext.sql.ResultSet
+If you are using JascyncDBPool you should cast the result to as [com.github.jasync.sql.db.QueryResult](https://github.com/jasync-sql/jasync-sql/wiki/Executing-Statements#query)
 
 #### Preprocess Result Rows
 The query method accepts a lambda where you can process the raw data map to the POJO/entity class you need.
@@ -466,6 +470,7 @@ The example insert returns a List of inserted IDs, this can only work if you hav
 pool.setInsertStatementMode(Statement.RETURN_GENERATED_KEYS)
 ```
 Note: Not all database works with this, for instance Apache Ignite will throw exception since it does not support this SQL feature.
+Jasync driver on the other hand [only works with MySQL](https://github.com/jasync-sql/jasync-sql/wiki/FAQ#q-i-inserted-a-row-how-do-i-get-an-auto-incremented-id) (this high performance non-blocking driver is for MySQL and PostgreSQL only)
 
 #### More controls on connection
 To execute the queries with more control you can get the underlying connection object by calling rawConnection:
@@ -569,35 +574,7 @@ Execute join queries where User has address and has many roles
 ```
 Example output json encode
 ```json
-[
-    {
-        "id": 3,
-        "name": "Joey",
-        "role": null,
-        "address": null
-    },
-    {
-        "id": 2,
-        "name": "John",
-        "role": [
-            {
-                "role_id": 1,
-                "type": "admin"
-            },
-            {
-                "role_id": 5,
-                "type": "super moderator"
-            }
-        ],
-        "address": [
-            {
-                "id": 2,
-                "street1": "Jalan Gembira",
-                "street2": "Taman OUG"
-            }
-        ]
-    },
-    {
+[{
         "id": 1,
         "name": "Bat Man",
         "role": [
@@ -611,21 +588,24 @@ Example output json encode
                 "id": 1,
                 "street1": "Jalan SS16/1",
                 "street2": "Taman Tun"
-            },
-            {
-                "id": 3,
-                "street1": "Jalan Bunga",
-                "street2": "Taman Negara"
             }
         ]
-    }
-]
+}]
 ```
+
+## Performance
+This is a simple benchmark with a rate of 2500 QPS on the query builder with result mapped across all three DB drivers
+<p align="center">
+    <img src="./zeko-sql-builder-benchmark.jpeg" alt="Zeko Query Builder Benchmark" />
+</p>
+Hardware: MacBook Pro (13-inch, 2018, Four Thunderbolt 3 Ports) 2.3 GHz Intel Core i5 8 GB 2133 MHz LPDDR3
+
+
 ## Download 
 
     <dependency>
       <groupId>io.zeko</groupId>
       <artifactId>zeko-sql-builder</artifactId>
-      <version>1.0.7</version>
+      <version>1.1.0</version>
     </dependency>
     
