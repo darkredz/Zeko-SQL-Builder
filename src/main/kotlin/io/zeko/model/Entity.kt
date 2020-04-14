@@ -1,17 +1,17 @@
 package io.zeko.model
 
 abstract class Entity {
-    protected var map: MutableMap<String, Any?> = mutableMapOf()
+    protected var map: MutableMap<String, Any?>
 
     constructor(map: Map<String, Any?>) {
         if (map is MutableMap)
-            this.map = map
+            this.map = map.withDefault { null }
         else
-            this.map = map.toMutableMap()
+            this.map = map.toMutableMap().withDefault { null }
     }
 
     constructor(vararg props: Pair<String, Any?>) {
-        this.map = mutableMapOf(*props)
+        this.map = mutableMapOf(*props).withDefault { null }
     }
 
     open fun tableName(): String = ""
