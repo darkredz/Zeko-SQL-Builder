@@ -54,14 +54,15 @@ class JasyncDBPool : DBPool {
         }
         var charset: Charset = if (config.containsKey("characterEncoding")) Charset.forName(config["characterEncoding"]) else Charset.forName("utf-8")
 
-        val dbConfig = ConnectionPoolConfigurationBuilder(
-            host = config["host"]!!,
-            port = config["port"]!!.toInt(),
-            database = config["database"]!!,
-            username = config["user"]!!,
-            password = config["password"]!!,
+        val dbConfig = ConnectionPoolConfigurationBuilder().apply {
+            host = config["host"]!!
+            port = config["port"]!!.toInt()
+            database = config["database"]!!
+            username = config["user"]!!
+            if (config.containsKey("password"))
+                password = config["password"]!!
             charset = charset
-        )
+        }
         return (databaseType to dbConfig)
     }
 
