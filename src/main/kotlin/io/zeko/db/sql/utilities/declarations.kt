@@ -13,3 +13,29 @@ fun String.toSnakeCase(): String {
     }
     return text
 }
+
+fun String.toCamelCase(): String {
+    if (this.isEmpty()) {
+        return ""
+    }
+    var camelCase = this.substring(0, 1).toLowerCase()
+
+    if (this.length > 1) {
+        var wordStart = false;
+
+        for (i in 1..(this.length - 1)) {
+            var currChar = this[i]
+            if (currChar == '_') {
+                wordStart = true
+            } else {
+                if (wordStart) {
+                    camelCase += currChar.toUpperCase()
+                } else {
+                    camelCase += currChar.toLowerCase()
+                }
+                wordStart = false
+            }
+        }
+    }
+    return camelCase
+}

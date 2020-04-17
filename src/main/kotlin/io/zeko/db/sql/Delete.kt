@@ -37,8 +37,9 @@ open class Delete : DataManipulation {
                 sql += "WHERE "
                 val entries = entity.dataMap().entries
 
-                for ((prop, value) in entries) {
+                for ((propName, value) in entries) {
                     if (shouldIgnoreType(value)) continue
+                    val prop = propName.toSnakeCase()
 
                     if (parameterize) {
                         sql += "$prop = ? AND "

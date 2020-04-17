@@ -117,7 +117,7 @@ class JasyncDBSession : DBSession {
         val columns = rs.columnNames()
         rs.forEach {
             val dataMap = mutableMapOf<String, Any?>()
-            for (i in 0..columns.size) {
+            for (i in 0 until columns.size) {
                 val colName = columns[i].toLowerCase()
                 dataMap[colName] = it[colName]
             }

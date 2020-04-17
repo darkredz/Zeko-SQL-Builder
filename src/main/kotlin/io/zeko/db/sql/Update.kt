@@ -1,5 +1,6 @@
 package io.zeko.db.sql
 
+import io.zeko.db.sql.utilities.toSnakeCase
 import io.zeko.model.Entity
 
 open class Update : DataManipulation {
@@ -31,8 +32,9 @@ open class Update : DataManipulation {
 
         if (entity.dataMap().isNotEmpty()) {
             val entries = entity.dataMap().entries
-            for ((prop, value) in entries) {
+            for ((propName, value) in entries) {
                 if (shouldIgnoreType(value)) continue
+                val prop = propName.toSnakeCase()
 
                 if (parameterize) {
                     sql += "$prop = ?, "
