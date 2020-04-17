@@ -4,6 +4,7 @@ import io.zeko.db.sql.utilities.toCamelCase
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneOffset
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
 abstract class Entity {
@@ -96,6 +97,16 @@ abstract class Entity {
             }
             Type.DATE -> {
                 LocalDate.parse(value.toString())
+            }
+            Type.ZONEDATETIME_UTC -> {
+                val dateStr = value.toString()
+                var pattern: DateTimeFormatter
+                if (dateStr.indexOf("T") > 0) {
+                    pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
+                } else {
+                    pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SXXX")
+                }
+                ZonedDateTime.parse(dateStr + "Z", pattern)
             }
             Type.DATETIME_UTC -> {
                 val dateStr = value.toString()

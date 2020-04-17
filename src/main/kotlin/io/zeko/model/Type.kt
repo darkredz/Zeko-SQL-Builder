@@ -8,6 +8,7 @@ enum class Type {
     DOUBLE,
     DATETIME,
     DATE,
+    ZONEDATETIME_UTC,
     DATETIME_UTC,
     DATE_UTC
 }
