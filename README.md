@@ -606,6 +606,6 @@ Hardware: MacBook Pro (13-inch, 2018, Four Thunderbolt 3 Ports) 2.3 GHz Intel Co
     <dependency>
       <groupId>io.zeko</groupId>
       <artifactId>zeko-sql-builder</artifactId>
-      <version>1.1.0</version>
+      <version>1.1.1</version>
     </dependency>
     
