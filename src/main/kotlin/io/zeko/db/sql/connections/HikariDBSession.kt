@@ -135,7 +135,13 @@ open class HikariDBSession : DBSession {
                 is Short -> this.setShort(idx, v)
                 is Double -> this.setDouble(idx, v)
                 is Float -> this.setFloat(idx, v)
-                is ZonedDateTime -> this.setTimestamp(idx, Timestamp(Date.from(v.toInstant()).time))
+                // if is zoned, stored in DB datetime field as the UTC date time,
+                // when doing Entity prop type mapping with datetime_utc, it will be auto converted to ZonedDateTime with value in DB consider as UTC value
+                is ZonedDateTime -> {
+                    val systemZoneDateTime = v.withZoneSameInstant(ZoneId.of("UTC"))
+                    val local = systemZoneDateTime.toLocalDateTime()
+                    this.setTimestamp(idx, Timestamp(ZonedDateTime.of(local, ZoneId.systemDefault()).toInstant().toEpochMilli()))
+                }
                 is OffsetDateTime -> this.setTimestamp(idx, Timestamp(Date.from(v.toInstant()).time))
                 is Instant -> this.setTimestamp(idx, Timestamp(Date.from(v).time))
                 is java.time.LocalDateTime -> this.setTimestamp(idx, Timestamp(LocalDateTime.parse(v.toString()).toDate().time))

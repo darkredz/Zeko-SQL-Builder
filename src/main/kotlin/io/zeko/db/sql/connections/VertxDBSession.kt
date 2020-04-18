@@ -11,6 +11,10 @@ import kotlinx.coroutines.delay
 import java.lang.Exception
 import java.util.LinkedHashMap
 import io.vertx.ext.sql.ResultSet
+import java.sql.Date
+import java.sql.Time
+import java.sql.Timestamp
+import java.time.*
 
 class VertxDBSession : DBSession {
     var conn: DBConn
@@ -117,11 +121,37 @@ class VertxDBSession : DBSession {
         conn.close()
     }
 
+    private fun convertParams(params: List<Any?>): JsonArray {
+        if (!params.isNullOrEmpty()) {
+            val converted = arrayListOf<Any?>()
+            //Vertx accepts Timestamp for date/time field
+            params.forEach { value ->
+                val v = when (value) {
+                    is LocalDate -> Date.valueOf(value)
+                    is LocalDateTime -> Timestamp.valueOf(value)
+                    is LocalTime -> Time.valueOf(value)
+                    is Instant -> Timestamp.valueOf(value.atZone(ZoneId.systemDefault()).toLocalDateTime())
+                    // if is zoned, stored in DB datetime field as the UTC date time,
+                    // when doing Entity prop type mapping with datetime_utc, it will be auto converted to ZonedDateTime with value in DB consider as UTC value
+                    is ZonedDateTime -> {
+                        val systemZoneDateTime = value.withZoneSameInstant(ZoneId.of("UTC"))
+                        val local = systemZoneDateTime.toLocalDateTime()
+                        Timestamp(ZonedDateTime.of(local, ZoneId.systemDefault()).toInstant().toEpochMilli())
+                    }
+                    else -> value
+                }
+                converted.add(v)
+            }
+            return JsonArray(converted)
+        }
+        return JsonArray(params)
+    }
+
     override suspend fun update(sql: String, params: List<Any?>, closeStatement: Boolean, closeConn: Boolean): Int {
         var updateRes: UpdateResult?
         var affectedRows = 0
         try {
-            updateRes = rawConn.updateWithParamsAwait(sql, JsonArray(params))
+            updateRes = rawConn.updateWithParamsAwait(sql, convertParams(params))
             affectedRows = updateRes.updated
         } catch (err: java.sql.SQLFeatureNotSupportedException) {
             return affectedRows
@@ -134,7 +164,7 @@ class VertxDBSession : DBSession {
     override suspend fun insert(sql: String, params: List<Any?>, closeStatement: Boolean, closeConn: Boolean): List<*> {
         var updateRes: UpdateResult? = null
         try {
-            updateRes = rawConn.updateWithParamsAwait(sql, JsonArray(params))
+            updateRes = rawConn.updateWithParamsAwait(sql, convertParams(params))
             val affectedRows = updateRes.updated
             if (affectedRows == 0) {
                 return listOf<Void>()
@@ -152,7 +182,7 @@ class VertxDBSession : DBSession {
     }
 
     override suspend fun queryPrepared(sql: String, params: List<Any?>, dataClassHandler: (dataMap: Map<String, Any?>) -> Any, closeStatement: Boolean, closeConn: Boolean): List<*> {
-        val res = rawConn.queryWithParamsAwait(sql, JsonArray(params))
+        val res = rawConn.queryWithParamsAwait(sql, convertParams(params))
         val rows = res.rows.map { jObj ->
             val rowMap = jObj.map.mapKeys { it.key.toLowerCase() }
             dataClassHandler(rowMap)
@@ -162,11 +192,11 @@ class VertxDBSession : DBSession {
     }
 
     override suspend fun queryPrepared(sql: String, params: List<Any?>): ResultSet {
-        return rawConn.queryWithParamsAwait(sql, JsonArray(params))
+        return rawConn.queryWithParamsAwait(sql, convertParams(params))
     }
 
     override suspend fun queryPrepared(sql: String, params: List<Any?>, columns: List<String>, closeConn: Boolean): List<LinkedHashMap<String, Any?>> {
-        val res = rawConn.queryWithParamsAwait(sql, JsonArray(params))
+        val res = rawConn.queryWithParamsAwait(sql, convertParams(params))
         val rs = res.toMaps(columns)
         if (closeConn) conn.close()
         return rs
