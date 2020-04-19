@@ -16,10 +16,11 @@ import java.sql.Time
 import java.sql.Timestamp
 import java.time.*
 
-class VertxDBSession : DBSession {
-    var conn: DBConn
-    var dbPool: DBPool
-    var rawConn: SQLConnection
+open class VertxDBSession : DBSession {
+    protected var conn: DBConn
+    protected var dbPool: DBPool
+    protected var rawConn: SQLConnection
+    protected var logger: DBLogger? = null
 
     constructor(dbPool: DBPool, conn: DBConn) {
         this.dbPool = dbPool
@@ -38,6 +39,7 @@ class VertxDBSession : DBSession {
             val result: A = operation.invoke(this)
             return result
         } catch (e: Exception) {
+            logger?.logError(e)
             throw e
         } finally {
             conn.close()
@@ -52,8 +54,10 @@ class VertxDBSession : DBSession {
                 if (delayTry > 0) {
                     delay(delayTry)
                 }
+                logger?.logRetry(numRetries, e)
                 retry(numRetries - 1, delayTry, operation)
             } else {
+                logger?.logError(e)
                 throw e
             }
         } finally {
@@ -75,9 +79,11 @@ class VertxDBSession : DBSession {
                 if (delayTry > 0) {
                     delay(delayTry)
                 }
+                logger?.logRetry(numRetries, e)
                 transaction(numRetries - 1, delayTry, operation)
             } else {
                 conn.rollback()
+                logger?.logError(e)
                 throw e
             }
         } finally {
@@ -96,6 +102,7 @@ class VertxDBSession : DBSession {
             return result
         } catch (e: Exception) {
             conn.rollback()
+            logger?.logError(e)
             throw e
         } finally {
             conn.endTx()
@@ -111,6 +118,7 @@ class VertxDBSession : DBSession {
             return result
         } catch (e: Exception) {
             conn.rollback()
+            logger?.logError(e)
             throw e
         } finally {
             conn.endTx()
@@ -119,6 +127,15 @@ class VertxDBSession : DBSession {
 
     override suspend fun close() {
         conn.close()
+    }
+
+    override fun setQueryLogger(logger: DBLogger): DBSession {
+        this.logger = logger
+        return this
+    }
+
+    override fun getQueryLogger(): DBLogger? {
+        return this.logger
     }
 
     private fun convertParams(params: List<Any?>): JsonArray {
@@ -151,6 +168,7 @@ class VertxDBSession : DBSession {
         var updateRes: UpdateResult?
         var affectedRows = 0
         try {
+            logger?.logQuery(sql, params)
             updateRes = rawConn.updateWithParamsAwait(sql, convertParams(params))
             affectedRows = updateRes.updated
         } catch (err: java.sql.SQLFeatureNotSupportedException) {
@@ -164,6 +182,7 @@ class VertxDBSession : DBSession {
     override suspend fun insert(sql: String, params: List<Any?>, closeStatement: Boolean, closeConn: Boolean): List<*> {
         var updateRes: UpdateResult? = null
         try {
+            logger?.logQuery(sql, params)
             updateRes = rawConn.updateWithParamsAwait(sql, convertParams(params))
             val affectedRows = updateRes.updated
             if (affectedRows == 0) {
@@ -172,6 +191,7 @@ class VertxDBSession : DBSession {
             return updateRes.keys.toList()
         } catch (err: java.sql.SQLFeatureNotSupportedException) {
             // Apache ignite insert will return this due to Auto generated keys are not supported.
+            logger?.logUnsupportedSql(err)
             if (updateRes != null ) {
                 return updateRes?.keys.toList()
             }
@@ -182,6 +202,7 @@ class VertxDBSession : DBSession {
     }
 
     override suspend fun queryPrepared(sql: String, params: List<Any?>, dataClassHandler: (dataMap: Map<String, Any?>) -> Any, closeStatement: Boolean, closeConn: Boolean): List<*> {
+        logger?.logQuery(sql, params)
         val res = rawConn.queryWithParamsAwait(sql, convertParams(params))
         val rows = res.rows.map { jObj ->
             val rowMap = jObj.map.mapKeys { it.key.toLowerCase() }
@@ -192,10 +213,12 @@ class VertxDBSession : DBSession {
     }
 
     override suspend fun queryPrepared(sql: String, params: List<Any?>): ResultSet {
+        logger?.logQuery(sql, params)
         return rawConn.queryWithParamsAwait(sql, convertParams(params))
     }
 
     override suspend fun queryPrepared(sql: String, params: List<Any?>, columns: List<String>, closeConn: Boolean): List<LinkedHashMap<String, Any?>> {
+        logger?.logQuery(sql, params)
         val res = rawConn.queryWithParamsAwait(sql, convertParams(params))
         val rs = res.toMaps(columns)
         if (closeConn) conn.close()
@@ -203,6 +226,7 @@ class VertxDBSession : DBSession {
     }
 
     override suspend fun query(sql: String, dataClassHandler: (dataMap: Map<String, Any?>) -> Any, closeStatement: Boolean, closeConn: Boolean): List<*> {
+        logger?.logQuery(sql)
         val res = rawConn.queryAwait(sql)
         val rows = res.rows.map { jObj ->
             val rowMap = jObj.map.mapKeys { it.key.toLowerCase() }
@@ -213,10 +237,12 @@ class VertxDBSession : DBSession {
     }
 
     override suspend fun query(sql: String): ResultSet {
+        logger?.logQuery(sql)
         return rawConn.queryAwait(sql)
     }
 
     override suspend fun query(sql: String, columns: List<String>, closeConn: Boolean): List<LinkedHashMap<String, Any?>> {
+        logger?.logQuery(sql)
         val res = rawConn.queryAwait(sql)
         val rs = res.toMaps(columns)
         if (closeConn) conn.close()

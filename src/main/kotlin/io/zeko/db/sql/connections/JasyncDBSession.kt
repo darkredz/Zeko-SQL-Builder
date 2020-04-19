@@ -9,10 +9,11 @@ import java.lang.Exception
 import java.time.*
 import java.util.LinkedHashMap
 
-class JasyncDBSession : DBSession {
-    var conn: DBConn
-    var dbPool: DBPool
-    var rawConn: Any
+open class JasyncDBSession : DBSession {
+    protected var conn: DBConn
+    protected var dbPool: DBPool
+    protected var rawConn: Any
+    protected var logger: DBLogger? = null
 
     constructor(dbPool: DBPool, conn: DBConn) {
         this.dbPool = dbPool
@@ -38,13 +39,24 @@ class JasyncDBSession : DBSession {
         return raw as SuspendingConnection
     }
 
+    override fun setQueryLogger(logger: DBLogger): DBSession {
+        this.logger = logger
+        return this
+    }
+
+    override fun getQueryLogger(): DBLogger? {
+        return this.logger
+    }
+
     override suspend fun update(sql: String, params: List<Any?>, closeStatement: Boolean, closeConn: Boolean): Int {
         var updateRes: QueryResult?
         var affectedRows = 0
         try {
+            logger?.logQuery(sql, params)
             updateRes = suspendingConn().sendPreparedStatement(sql, convertParams(params))
             affectedRows = updateRes.rowsAffected.toInt()
         } catch (err: java.sql.SQLFeatureNotSupportedException) {
+            logger?.logUnsupportedSql(err)
             return affectedRows
         } finally {
             if (closeConn) conn.close()
@@ -77,6 +89,7 @@ class JasyncDBSession : DBSession {
     override suspend fun insert(sql: String, params: List<Any?>, closeStatement: Boolean, closeConn: Boolean): List<*> {
         var updateRes: QueryResult? = null
         try {
+            logger?.logQuery(sql, params)
             updateRes = suspendingConn().sendPreparedStatement(sql, convertParams(params))
             val affectedRows = updateRes.rowsAffected.toInt()
             println("affectedRows $affectedRows")
@@ -88,6 +101,7 @@ class JasyncDBSession : DBSession {
             }
         } catch (err: java.sql.SQLFeatureNotSupportedException) {
             // Apache ignite insert will return this due to Auto generated keys are not supported.
+            logger?.logUnsupportedSql(err)
             if (updateRes != null ) {
                 if (updateRes is MySQLQueryResult) {
                     return listOf(updateRes.lastInsertId)
@@ -100,6 +114,7 @@ class JasyncDBSession : DBSession {
     }
 
     override suspend fun queryPrepared(sql: String, params: List<Any?>, dataClassHandler: (dataMap: Map<String, Any?>) -> Any, closeStatement: Boolean, closeConn: Boolean): List<*> {
+        logger?.logQuery(sql, params)
         val res = suspendingConn().sendPreparedStatement(sql, convertParams(params))
         val rows = resultSetToObjects(res.rows, dataClassHandler)
         if (closeConn) conn.close()
@@ -107,10 +122,12 @@ class JasyncDBSession : DBSession {
     }
 
     override suspend fun queryPrepared(sql: String, params: List<Any?>): QueryResult {
+        logger?.logQuery(sql, params)
         return suspendingConn().sendPreparedStatement(sql, convertParams(params))
     }
 
     override suspend fun queryPrepared(sql: String, params: List<Any?>, columns: List<String>, closeConn: Boolean): List<LinkedHashMap<String, Any?>> {
+        logger?.logQuery(sql, params)
         val res = suspendingConn().sendPreparedStatement(sql, convertParams(params))
         val rs = res.rows.toMaps(columns)
         if (closeConn) conn.close()
@@ -118,6 +135,7 @@ class JasyncDBSession : DBSession {
     }
 
     override suspend fun query(sql: String, dataClassHandler: (dataMap: Map<String, Any?>) -> Any, closeStatement: Boolean, closeConn: Boolean): List<*> {
+        logger?.logQuery(sql)
         val res = suspendingConn().sendQuery(sql)
         val rows = resultSetToObjects(res.rows, dataClassHandler)
         if (closeConn) conn.close()
@@ -125,10 +143,12 @@ class JasyncDBSession : DBSession {
     }
 
     override suspend fun query(sql: String): QueryResult {
+        logger?.logQuery(sql)
         return suspendingConn().sendQuery(sql)
     }
 
     override suspend fun query(sql: String, columns: List<String>, closeConn: Boolean): List<LinkedHashMap<String, Any?>> {
+        logger?.logQuery(sql)
         val res = suspendingConn().sendQuery(sql)
         val rs = res.rows.toMaps(columns)
         if (closeConn) conn.close()
@@ -155,6 +175,7 @@ class JasyncDBSession : DBSession {
             val result: A = operation.invoke(this)
             return result
         } catch (e: Exception) {
+            logger?.logError(e)
             throw e
         } finally {
             // conn.close()
@@ -169,8 +190,10 @@ class JasyncDBSession : DBSession {
                 if (delayTry > 0) {
                     delay(delayTry)
                 }
+                logger?.logRetry(numRetries, e)
                 retry(numRetries - 1, delayTry, operation)
             } else {
+                logger?.logError(e)
                 throw e
             }
         } finally {
@@ -191,8 +214,10 @@ class JasyncDBSession : DBSession {
                 if (delayTry > 0) {
                     delay(delayTry)
                 }
+                logger?.logRetry(numRetries, e)
                 transaction(numRetries - 1, delayTry, operation)
             } else {
+                logger?.logError(e)
                 throw e
             }
         } finally {
