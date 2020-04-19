@@ -6,12 +6,14 @@ import com.github.jasync.sql.db.mysql.MySQLQueryResult
 import io.zeko.model.declarations.toMaps
 import kotlinx.coroutines.delay
 import java.lang.Exception
+import java.time.*
 import java.util.LinkedHashMap
 
-class JasyncDBSession : DBSession {
-    var conn: DBConn
-    var dbPool: DBPool
-    var rawConn: Any
+open class JasyncDBSession : DBSession {
+    protected var conn: DBConn
+    protected var dbPool: DBPool
+    protected var rawConn: Any
+    protected var logger: DBLogger? = null
 
     constructor(dbPool: DBPool, conn: DBConn) {
         this.dbPool = dbPool
@@ -37,13 +39,24 @@ class JasyncDBSession : DBSession {
         return raw as SuspendingConnection
     }
 
+    override fun setQueryLogger(logger: DBLogger): DBSession {
+        this.logger = logger
+        return this
+    }
+
+    override fun getQueryLogger(): DBLogger? {
+        return this.logger
+    }
+
     override suspend fun update(sql: String, params: List<Any?>, closeStatement: Boolean, closeConn: Boolean): Int {
         var updateRes: QueryResult?
         var affectedRows = 0
         try {
-            updateRes = suspendingConn().sendPreparedStatement(sql, params)
+            logger?.logQuery(sql, params)
+            updateRes = suspendingConn().sendPreparedStatement(sql, convertParams(params))
             affectedRows = updateRes.rowsAffected.toInt()
         } catch (err: java.sql.SQLFeatureNotSupportedException) {
+            logger?.logUnsupportedSql(err)
             return affectedRows
         } finally {
             if (closeConn) conn.close()
@@ -51,10 +64,33 @@ class JasyncDBSession : DBSession {
         return affectedRows
     }
 
+    private fun convertParams(params: List<Any?>): List<Any?> {
+        if (!params.isNullOrEmpty()) {
+            val converted = arrayListOf<Any?>()
+            //Jasync accepts only Joda date time instead of java.time
+            params.forEach { value ->
+                val v = when (value) {
+                    is LocalDate -> org.joda.time.LocalDate(value.year, value.monthValue, value.dayOfMonth)
+                    is LocalDateTime -> org.joda.time.LocalDateTime(value.year, value.monthValue, value.dayOfMonth, value.hour, value.minute, value.second, value.nano / 1000000)
+                    is LocalTime -> org.joda.time.LocalTime(value.hour, value.minute, value.second, value.nano / 1000000)
+                    is Instant -> org.joda.time.Instant(value.toEpochMilli())
+                    // if is zoned, stored in DB datetime field as the UTC date time,
+                    // when doing Entity prop type mapping with datetime_utc, it will be auto converted to ZonedDateTime with value in DB consider as UTC value
+                    is ZonedDateTime -> org.joda.time.LocalDateTime.parse(value.toInstant().toString().removeSuffix("Z"))
+                    else -> value
+                }
+                converted.add(v)
+            }
+            return converted
+        }
+        return params
+    }
+
     override suspend fun insert(sql: String, params: List<Any?>, closeStatement: Boolean, closeConn: Boolean): List<*> {
         var updateRes: QueryResult? = null
         try {
-            updateRes = suspendingConn().sendPreparedStatement(sql, params)
+            logger?.logQuery(sql, params)
+            updateRes = suspendingConn().sendPreparedStatement(sql, convertParams(params))
             val affectedRows = updateRes.rowsAffected.toInt()
             println("affectedRows $affectedRows")
             if (affectedRows == 0) {
@@ -65,6 +101,7 @@ class JasyncDBSession : DBSession {
             }
         } catch (err: java.sql.SQLFeatureNotSupportedException) {
             // Apache ignite insert will return this due to Auto generated keys are not supported.
+            logger?.logUnsupportedSql(err)
             if (updateRes != null ) {
                 if (updateRes is MySQLQueryResult) {
                     return listOf(updateRes.lastInsertId)
@@ -77,24 +114,28 @@ class JasyncDBSession : DBSession {
     }
 
     override suspend fun queryPrepared(sql: String, params: List<Any?>, dataClassHandler: (dataMap: Map<String, Any?>) -> Any, closeStatement: Boolean, closeConn: Boolean): List<*> {
-        val res = suspendingConn().sendPreparedStatement(sql, params)
+        logger?.logQuery(sql, params)
+        val res = suspendingConn().sendPreparedStatement(sql, convertParams(params))
         val rows = resultSetToObjects(res.rows, dataClassHandler)
         if (closeConn) conn.close()
         return rows
     }
 
     override suspend fun queryPrepared(sql: String, params: List<Any?>): QueryResult {
-        return suspendingConn().sendPreparedStatement(sql, params)
+        logger?.logQuery(sql, params)
+        return suspendingConn().sendPreparedStatement(sql, convertParams(params))
     }
 
     override suspend fun queryPrepared(sql: String, params: List<Any?>, columns: List<String>, closeConn: Boolean): List<LinkedHashMap<String, Any?>> {
-        val res = suspendingConn().sendPreparedStatement(sql, params)
+        logger?.logQuery(sql, params)
+        val res = suspendingConn().sendPreparedStatement(sql, convertParams(params))
         val rs = res.rows.toMaps(columns)
         if (closeConn) conn.close()
         return rs
     }
 
     override suspend fun query(sql: String, dataClassHandler: (dataMap: Map<String, Any?>) -> Any, closeStatement: Boolean, closeConn: Boolean): List<*> {
+        logger?.logQuery(sql)
         val res = suspendingConn().sendQuery(sql)
         val rows = resultSetToObjects(res.rows, dataClassHandler)
         if (closeConn) conn.close()
@@ -102,10 +143,12 @@ class JasyncDBSession : DBSession {
     }
 
     override suspend fun query(sql: String): QueryResult {
+        logger?.logQuery(sql)
         return suspendingConn().sendQuery(sql)
     }
 
     override suspend fun query(sql: String, columns: List<String>, closeConn: Boolean): List<LinkedHashMap<String, Any?>> {
+        logger?.logQuery(sql)
         val res = suspendingConn().sendQuery(sql)
         val rs = res.rows.toMaps(columns)
         if (closeConn) conn.close()
@@ -132,6 +175,7 @@ class JasyncDBSession : DBSession {
             val result: A = operation.invoke(this)
             return result
         } catch (e: Exception) {
+            logger?.logError(e)
             throw e
         } finally {
             // conn.close()
@@ -146,8 +190,10 @@ class JasyncDBSession : DBSession {
                 if (delayTry > 0) {
                     delay(delayTry)
                 }
+                logger?.logRetry(numRetries, e)
                 retry(numRetries - 1, delayTry, operation)
             } else {
+                logger?.logError(e)
                 throw e
             }
         } finally {
@@ -168,8 +214,10 @@ class JasyncDBSession : DBSession {
                 if (delayTry > 0) {
                     delay(delayTry)
                 }
+                logger?.logRetry(numRetries, e)
                 transaction(numRetries - 1, delayTry, operation)
             } else {
+                logger?.logError(e)
                 throw e
             }
         } finally {

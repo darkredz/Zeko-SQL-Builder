@@ -1,9 +1,7 @@
 package io.zeko.model
 
 import io.zeko.db.sql.utilities.toCamelCase
-import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.ZoneOffset
+import java.time.*
 import java.time.format.DateTimeFormatter
 
 abstract class Entity {
@@ -83,29 +81,62 @@ abstract class Entity {
                 else -> value
             }
             Type.DATETIME -> {
-                val dateStr = value.toString()
-                var pattern: DateTimeFormatter
-                // Jasync returns 2020-01-12T23:10:32.000
-                // Hikari returns 2020-01-12 23:10:32.0
-                if (dateStr.indexOf("T") > 0) {
-                    pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
+                if (value !is String) {
+                    val dateStr = value.toString()
+                    var pattern: DateTimeFormatter
+                    // Jasync returns 2020-01-12T23:10:32.000
+                    // Hikari returns 2020-01-12 23:10:32.0
+                    if (dateStr.indexOf("T") > 0) {
+                        pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
+                    } else {
+                        pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.S")
+                    }
+                    LocalDateTime.parse(dateStr, pattern)
                 } else {
-                    pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.S")
+                    //Vertx JDBC client returns date time field as String and already converted to UTC
+                    val pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")
+                    val systemZoneDateTime = ZonedDateTime.parse(value, pattern).withZoneSameInstant(ZoneId.systemDefault())
+                    return systemZoneDateTime.toLocalDateTime()
                 }
-                LocalDateTime.parse(dateStr, pattern)
             }
             Type.DATE -> {
                 LocalDate.parse(value.toString())
             }
-            Type.DATETIME_UTC -> {
-                val dateStr = value.toString()
-                var pattern: DateTimeFormatter
-                if (dateStr.indexOf("T") > 0) {
-                    pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
+            Type.ZONEDATETIME_UTC -> {
+                if (value !is String) {
+                    val dateStr = value.toString()
+                    var pattern: DateTimeFormatter
+                    if (dateStr.indexOf("T") > 0) {
+                        pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
+                    } else {
+                        pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SXXX")
+                    }
+                    ZonedDateTime.parse(dateStr + "Z", pattern)
                 } else {
-                    pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.S")
+                    //Vertx JDBC client returns date time field as String and already converted to UTC
+                    val pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")
+                    val systemZoneDateTime = ZonedDateTime.parse(value, pattern).withZoneSameInstant(ZoneId.systemDefault())
+                    val local = systemZoneDateTime.toLocalDateTime()
+                    ZonedDateTime.of(local, ZoneId.of("UTC"))
                 }
-                LocalDateTime.parse(dateStr, pattern).atZone(ZoneOffset.UTC).toInstant()
+            }
+            Type.DATETIME_UTC -> {
+                if (value !is String) {
+                    val dateStr = value.toString()
+                    var pattern: DateTimeFormatter
+                    if (dateStr.indexOf("T") > 0) {
+                        pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
+                    } else {
+                        pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.S")
+                    }
+                    LocalDateTime.parse(dateStr, pattern).atZone(ZoneOffset.UTC).toInstant()
+                } else {
+                    //Vertx JDBC client returns date time field as String and already converted to UTC
+                    val pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")
+                    val systemZoneDateTime = ZonedDateTime.parse(value, pattern).withZoneSameInstant(ZoneId.systemDefault())
+                    val local = systemZoneDateTime.toLocalDateTime()
+                    ZonedDateTime.of(local, ZoneId.of("UTC")).toInstant()
+                }
             }
             Type.DATE_UTC -> {
                 LocalDate.parse(value.toString()).atStartOfDay().toInstant(ZoneOffset.UTC)

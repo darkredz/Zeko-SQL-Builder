@@ -18,9 +18,10 @@ import kotlin.collections.HashMap
 import kotlin.collections.LinkedHashMap
 
 open class HikariDBSession : DBSession {
-    var conn: DBConn
-    var dbPool: DBPool
-    var rawConn: Connection
+    protected var conn: DBConn
+    protected var dbPool: DBPool
+    protected var rawConn: Connection
+    protected var logger: DBLogger? = null
 
     constructor(dbPool: DBPool, conn: DBConn) {
         this.dbPool = dbPool
@@ -39,6 +40,7 @@ open class HikariDBSession : DBSession {
             val result: A = operation.invoke(this)
             return result
         } catch (e: Exception) {
+            logger?.logError(e)
             throw e
         } finally {
             conn.close()
@@ -53,8 +55,10 @@ open class HikariDBSession : DBSession {
                 if (delayTry > 0) {
                     delay(delayTry)
                 }
+                logger?.logRetry(numRetries, e)
                 retry(numRetries - 1, delayTry, operation)
             } else {
+                logger?.logError(e)
                 throw e
             }
         } finally {
@@ -76,9 +80,11 @@ open class HikariDBSession : DBSession {
                 if (delayTry > 0) {
                     delay(delayTry)
                 }
+                logger?.logRetry(numRetries, e)
                 transaction(numRetries - 1, delayTry, operation)
             } else {
                 conn.rollback()
+                logger?.logError(e)
                 throw e
             }
         } finally {
@@ -97,6 +103,7 @@ open class HikariDBSession : DBSession {
             return result
         } catch (e: Exception) {
             conn.rollback()
+            logger?.logError(e)
             throw e
         } finally {
             conn.endTx()
@@ -112,6 +119,7 @@ open class HikariDBSession : DBSession {
             return result
         } catch (e: Exception) {
             conn.rollback()
+            logger?.logError(e)
             throw e
         } finally {
             conn.endTx()
@@ -120,6 +128,15 @@ open class HikariDBSession : DBSession {
 
     override suspend fun close() {
         conn.close()
+    }
+
+    override fun setQueryLogger(logger: DBLogger): DBSession {
+        this.logger = logger
+        return this
+    }
+
+    override fun getQueryLogger(): DBLogger? {
+        return this.logger
     }
 
     private fun PreparedStatement.setParam(idx: Int, v: Any?) {
@@ -135,7 +152,13 @@ open class HikariDBSession : DBSession {
                 is Short -> this.setShort(idx, v)
                 is Double -> this.setDouble(idx, v)
                 is Float -> this.setFloat(idx, v)
-                is ZonedDateTime -> this.setTimestamp(idx, Timestamp(Date.from(v.toInstant()).time))
+                // if is zoned, stored in DB datetime field as the UTC date time,
+                // when doing Entity prop type mapping with datetime_utc, it will be auto converted to ZonedDateTime with value in DB consider as UTC value
+                is ZonedDateTime -> {
+                    val systemZoneDateTime = v.withZoneSameInstant(ZoneId.of("UTC"))
+                    val local = systemZoneDateTime.toLocalDateTime()
+                    this.setTimestamp(idx, Timestamp(ZonedDateTime.of(local, ZoneId.systemDefault()).toInstant().toEpochMilli()))
+                }
                 is OffsetDateTime -> this.setTimestamp(idx, Timestamp(Date.from(v.toInstant()).time))
                 is Instant -> this.setTimestamp(idx, Timestamp(Date.from(v).time))
                 is java.time.LocalDateTime -> this.setTimestamp(idx, Timestamp(LocalDateTime.parse(v.toString()).toDate().time))
@@ -161,6 +184,7 @@ open class HikariDBSession : DBSession {
     }
 
     protected fun prepareStatement(sql: String, params: List<Any?>, mode: Int = -1): PreparedStatement {
+        logger?.logQuery(sql, params)
         val stmt: PreparedStatement = if (mode > -1) rawConn.prepareStatement(sql, mode) else rawConn.prepareStatement(sql)
         if (!params.isNullOrEmpty()) {
             params.forEachIndexed { index, value ->
@@ -195,6 +219,7 @@ open class HikariDBSession : DBSession {
             }
         } catch (err: java.sql.SQLFeatureNotSupportedException) {
             // Apache ignite insert will return this due to Auto generated keys are not supported.
+            logger?.logUnsupportedSql(err)
             return listOf<Void>()
         } finally {
             if (closeStatement) stmt.close()
@@ -230,6 +255,7 @@ open class HikariDBSession : DBSession {
     }
 
     override suspend fun query(sql: String, dataClassHandler: (dataMap: Map<String, Any?>) -> Any, closeStatement: Boolean, closeConn: Boolean): List<*> {
+        logger?.logQuery(sql)
         val stmt: Statement = rawConn.createStatement()
         val rs = stmt.executeQuery(sql)
         val rows = resultSetToObjects(rs, dataClassHandler)
@@ -240,12 +266,14 @@ open class HikariDBSession : DBSession {
     }
 
     override suspend fun query(sql: String): ResultSet {
+        logger?.logQuery(sql)
         val stmt: Statement = rawConn.createStatement()
         val rs = stmt.executeQuery(sql)
         return rs
     }
 
     override suspend fun query(sql: String, columns: List<String>, closeConn: Boolean): List<LinkedHashMap<String, Any?>>  {
+        logger?.logQuery(sql)
         val stmt: Statement = rawConn.createStatement()
         val rs = stmt.executeQuery(sql)
         val result = rs.toMaps(columns)

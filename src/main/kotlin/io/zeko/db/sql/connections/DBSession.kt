@@ -6,6 +6,8 @@ interface DBSession {
     fun pool(): DBPool
     fun connection(): DBConn
     fun rawConnection(): Any
+    fun setQueryLogger(logger: DBLogger): DBSession
+    fun getQueryLogger(): DBLogger?
 
     suspend fun <A> once(operation: suspend (DBSession) -> A): A
     suspend fun <A> retry(numRetries: Int, delayTry: Long = 0, operation: suspend (DBSession) -> A)
