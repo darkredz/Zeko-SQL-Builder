@@ -667,18 +667,19 @@ Example output json encode
 ```
 
 ## Performance
-This is a simple benchmark with a rate of 2500 QPS on the query builder with result mapped across all three DB drivers
+This is a simple benchmark with a rate of 2500 QPS on the query builder with result mapped across all three DB drivers(30 max connections pool)
 <p align="center">
     <img src="./zeko-sql-builder-benchmark.jpeg" alt="Zeko Query Builder Benchmark" />
 </p>
 Hardware: MacBook Pro (13-inch, 2018, Four Thunderbolt 3 Ports) 2.3 GHz Intel Core i5 8 GB 2133 MHz LPDDR3
 
 
-## Download 
+## Download
+Add this to your maven pom.xml
 
     <dependency>
       <groupId>io.zeko</groupId>
       <artifactId>zeko-sql-builder</artifactId>
-      <version>1.1.1</version>
+      <version>1.1.2</version>
     </dependency>
     
