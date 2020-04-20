@@ -210,7 +210,7 @@ class User : Entity {
     var id: Int?     by map
     var age: Int?     by map
     var name: String? by map
-    var role_id: String? by map
+    var roleId: Int? by map
     var role: List<Role>? by map
     var address: List<Address>? by map
 }
@@ -306,11 +306,11 @@ Or use agg(funcName, field, operator, value) to add in your desired aggregation 
 #### Add your own aggregation functions
 ```kotlin
 // Postgres square of the correlation coefficient
-fun regr_r2(field: String, value: Double)): QueryBlock {
+fun regr_r2(field: String, value: Double): QueryBlock {
     return agg("regr_r2", field, "=", value)
 }
 
-fun regr_r2_gt(field: String, value: Double)): QueryBlock {
+fun regr_r2_gt(field: String, value: Double): QueryBlock {
     return agg("regr_r2", field, ">", value)
 }
 ```
@@ -408,30 +408,10 @@ The once block will execute the query and then close the connection at the end o
     }
 ```
 If you are using VertxDBPool you should cast the result to as io.vertx.ext.sql.ResultSet
-If you are using JascyncDBPool you should cast the result to as [com.github.jasync.sql.db.QueryResult](https://github.com/jasync-sql/jasync-sql/wiki/Executing-Statements#query)
+If you are using JasyncDBPool you should cast the result to as [com.github.jasync.sql.db.QueryResult](https://github.com/jasync-sql/jasync-sql/wiki/Executing-Statements#query)
 
-#### Preprocess Result Rows
-The query method accepts a lambda where you can process the raw data map to the POJO/entity class you need.
-In this case User class is just a class with map delegate to its properties
-```kotlin
-class User(map: Map<String, Any?>) {
-    val defaultMap = map.withDefault { null }
-    val id: Int?     by defaultMap
-    val name: String? by defaultMap
-}
-
-suspend fun queryUsers(statusFlag: Int): List<User> {
-    lateinit var rows: List<User>
-    db.session().once { conn ->
-        val sql = "SELECT * FROM user WHERE status = ? ORDER BY id ASC"
-        rows = sess.queryPrepared(sql, listOf(1), { User(it) }) as List<User>
-    }
-}
-return rows
-```
-
-#### Retries
-The db session allows you to retry the same statements. 
+#### Retries, 
+The DB session allows you to retry the same statements. 
 Calling retry(2) instead of once will execute the code block additional 2 times if it failed
 ```kotlin
     suspend fun queryMe(statusFlag: Int) {
@@ -493,6 +473,99 @@ To execute the queries with more control you can get the underlying connection o
     } finally {
         conn.close()
     }
+```
+
+## Result Set Mapping to POJO/Entity
+The query method accepts a lambda where you can process the raw data map to the POJO/entity class you need.
+In this case User class is just a class with map delegate to its properties
+```kotlin
+class User : Entity {
+    constructor(map: Map<String, Any?>) : super(map)
+    constructor(vararg props: Pair<String, Any?>) : super(*props)
+    var id: Int?     by map
+    var name: String? by map
+}
+
+suspend fun queryUsers(statusFlag: Int): List<User> {
+    lateinit var rows: List<User>
+    db.session().once { conn ->
+        val sql = "SELECT * FROM user WHERE status = ? ORDER BY id ASC"
+        rows = sess.queryPrepared(sql, listOf(1), { User(it) }) as List<User>
+    }
+}
+return rows
+```
+
+## Entity Property Type Mapping
+There are times when working with different databases or different DB drivers, the java type conversion might be different from what you need.
+For instance, with a MySQL DATETIME column, Jasync returns Joda LocalDateTime, Hikari gives java.sql.Timestamp, Vert.x JDBC client return as String(auto converted to UTC timezone)
+While with TINYINT, Hikari and Vert.x return Boolean, Jasync returns Byte.
+
+In order to map the property to the type you need, override propTypeMapping with a map of property names to its relevant type.
+```kotlin
+import io.zeko.model.Entity
+import io.zeko.model.Type
+
+class User : Entity {
+    constructor(map: Map<String, Any?>) : super(map)
+    constructor(vararg props: Pair<String, Any?>) : super(*props)
+
+    override fun propTypeMapping() = mapOf(
+        "status" to Type.INT,
+        "subscribed" to Type.BOOL,
+        "lastAccessAt" to Type.ZONEDATETIME_UTC, //gives ZonedDateTime in UTC zone
+        "createdAt" to Type.DATETIME,
+        "dob" to Type.DATE  //gives LocalDate
+    )
+
+    var id: Int?     by map
+    var firstName: String? by map
+    var lastName: String? by map
+    var subscribed: Boolean? by map
+    var status: Int? by map
+    var dob: LocalDate? by map
+    var lastAccessAt: ZonedDateTime? by map
+    var createdAt: LocalDateTime? by map
+}
+```
+
+## Logging
+You can use any logging framework of your preference, just create a log provider class by implementing the DBLogger Interface.
+Example using Vert.x logger to log queries, retries blocks and sql errors.
+```kotlin
+import io.zeko.db.sql.connections.*
+import io.vertx.core.*
+import io.vertx.core.logging.LoggerFactory
+
+class BootstrapVerticle : AbstractVerticle() {
+    override fun start() {
+        val logger = VertxDBLog(LoggerFactory.getLogger("app")).setParamsLogLevel(DBLogLevel.OFF)
+        //...some db setup code
+        val db = JasyncDBSession(pool, pool.createConnection()).setQueryLogger(logger)
+    }
+}
+
+class VertxDBLog(val logger: Logger) : DBLogger {
+    var paramsLevel: DBLogLevel = DBLogLevel.DEBUG
+    var sqlLevel: DBLogLevel = DBLogLevel.DEBUG
+
+    override fun logQuery(sql: String, params: List<Any?>?) {
+        if (sqlLevel.level >= DBLogLevel.DEBUG.level) {
+            logger.debug("[SQL] $sql $params")
+        }
+        if (paramsLevel.level >= DBLogLevel.DEBUG.level && params != null) {
+            logger.debug("[SQL_PARAM] $params")
+        }
+    }
+    override fun logRetry(numRetriesLeft: Int, err: Exception) { logger.warn("[SQL_RETRY:$numRetriesLeft] $err") }
+    override fun logUnsupportedSql(err: Exception) { logger.warn("[SQL_UNSUPPORTED] $err") }
+    override fun logError(err: Exception) { logger.error("[SQL_ERROR] $err") }
+    override fun getParamsLogLevel(): DBLogLevel { return paramsLevel }
+    override fun getSqlLogLevel(): DBLogLevel { return sqlLevel }
+    override fun setParamsLogLevel(level: DBLogLevel): DBLogger { return this }
+    override fun setSqlLogLevel(level: DBLogLevel): DBLogger { return this }
+    override fun setLogLevels(sqlLevel: DBLogLevel, paramsLevel: DBLogLevel): DBLogger { return this }
+}
 ```
 
 ## Data Mapper
@@ -594,18 +667,19 @@ Example output json encode
 ```
 
 ## Performance
-This is a simple benchmark with a rate of 2500 QPS on the query builder with result mapped across all three DB drivers
+This is a simple benchmark with a rate of 2500 QPS on the query builder with result mapped across all three DB drivers(30 max connections pool)
 <p align="center">
     <img src="./zeko-sql-builder-benchmark.jpeg" alt="Zeko Query Builder Benchmark" />
 </p>
 Hardware: MacBook Pro (13-inch, 2018, Four Thunderbolt 3 Ports) 2.3 GHz Intel Core i5 8 GB 2133 MHz LPDDR3
 
 
-## Download 
+## Download
+Add this to your maven pom.xml
 
     <dependency>
       <groupId>io.zeko</groupId>
       <artifactId>zeko-sql-builder</artifactId>
-      <version>1.1.1</version>
+      <version>1.1.2</version>
     </dependency>
     
