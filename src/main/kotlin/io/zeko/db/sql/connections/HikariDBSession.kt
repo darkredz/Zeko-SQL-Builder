@@ -1,5 +1,7 @@
 package io.zeko.db.sql.connections
 
+import io.zeko.db.sql.exceptions.DuplicateKeyException
+import io.zeko.db.sql.exceptions.throwDuplicate
 import io.zeko.model.declarations.toMaps
 import kotlinx.coroutines.delay
 import org.joda.time.LocalDateTime
@@ -22,6 +24,7 @@ open class HikariDBSession : DBSession {
     protected var dbPool: DBPool
     protected var rawConn: Connection
     protected var logger: DBLogger? = null
+    protected var throwOnDuplicate = true
 
     constructor(dbPool: DBPool, conn: DBConn) {
         this.dbPool = dbPool
@@ -29,11 +32,24 @@ open class HikariDBSession : DBSession {
         rawConn = conn.raw() as Connection
     }
 
+    constructor(dbPool: DBPool, conn: DBConn, throwOnDuplicate: Boolean) {
+        this.dbPool = dbPool
+        this.conn = conn
+        rawConn = conn.raw() as Connection
+        this.throwOnDuplicate = throwOnDuplicate
+    }
+
     override fun pool(): DBPool = dbPool
 
     override fun connection(): DBConn = conn
 
     override fun rawConnection(): Connection = rawConn
+
+    protected fun throwDuplicateException(err: Exception) {
+        if (this.throwOnDuplicate) {
+            throwDuplicate(err)
+        }
+    }
 
     override suspend fun <A> once(operation: suspend (DBSession) -> A): A {
         try {
@@ -51,12 +67,17 @@ open class HikariDBSession : DBSession {
         try {
             val result: A = operation.invoke(this)
         } catch (e: Exception) {
-            if (numRetries > 0) {
-                if (delayTry > 0) {
-                    delay(delayTry)
+            if (e !is DuplicateKeyException) {
+                if (numRetries > 0) {
+                    if (delayTry > 0) {
+                        delay(delayTry)
+                    }
+                    logger?.logRetry(numRetries, e)
+                    retry(numRetries - 1, delayTry, operation)
+                } else {
+                    logger?.logError(e)
+                    throw e
                 }
-                logger?.logRetry(numRetries, e)
-                retry(numRetries - 1, delayTry, operation)
             } else {
                 logger?.logError(e)
                 throw e
@@ -74,14 +95,20 @@ open class HikariDBSession : DBSession {
             operation.invoke(this)
             conn.commit()
         } catch (e: Exception) {
-            if (numRetries > 0) {
-                conn.rollback()
-                conn.endTx()
-                if (delayTry > 0) {
-                    delay(delayTry)
+            if (e !is DuplicateKeyException) {
+                if (numRetries > 0) {
+                    conn.rollback()
+                    conn.endTx()
+                    if (delayTry > 0) {
+                        delay(delayTry)
+                    }
+                    logger?.logRetry(numRetries, e)
+                    transaction(numRetries - 1, delayTry, operation)
+                } else {
+                    conn.rollback()
+                    logger?.logError(e)
+                    throw e
                 }
-                logger?.logRetry(numRetries, e)
-                transaction(numRetries - 1, delayTry, operation)
             } else {
                 conn.rollback()
                 logger?.logError(e)
@@ -196,19 +223,30 @@ open class HikariDBSession : DBSession {
 
     override suspend fun update(sql: String, params: List<Any?>, closeStatement: Boolean, closeConn: Boolean): Int {
         val stmt = prepareStatement(sql, params)
-        val affectedRows = stmt.executeUpdate()
-        if (closeStatement) stmt.close()
-        if (closeConn) conn.close()
+        var affectedRows = 0
+        try {
+            affectedRows = stmt.executeUpdate()
+        } catch (err: java.sql.SQLFeatureNotSupportedException) {
+            logger?.logUnsupportedSql(err)
+            return 0
+        } catch (err: Exception) {
+            throwDuplicateException(err)
+            throw err
+        } finally {
+            if (closeStatement) stmt.close()
+            if (closeConn) conn.close()
+        }
         return affectedRows
     }
 
     override suspend fun insert(sql: String, params: List<Any?>, closeStatement: Boolean, closeConn: Boolean): List<*> {
         val stmt = prepareStatement(sql, params, dbPool.getInsertStatementMode())
-        val affectedRows = stmt.executeUpdate()
-        if (affectedRows == 0) {
-            return listOf<Void>()
-        }
+        var affectedRows = 0
         try {
+            affectedRows = stmt.executeUpdate()
+            if (affectedRows == 0) {
+                return listOf<Void>()
+            }
             if (dbPool.getInsertStatementMode() == Statement.RETURN_GENERATED_KEYS) {
                 val keys = arrayListOf<Any>()
                 val generatedKeys = stmt.generatedKeys
@@ -221,6 +259,9 @@ open class HikariDBSession : DBSession {
             // Apache ignite insert will return this due to Auto generated keys are not supported.
             logger?.logUnsupportedSql(err)
             return listOf<Void>()
+        } catch (err: Exception) {
+            throwDuplicateException(err)
+            throw err
         } finally {
             if (closeStatement) stmt.close()
             if (closeConn) conn.close()
