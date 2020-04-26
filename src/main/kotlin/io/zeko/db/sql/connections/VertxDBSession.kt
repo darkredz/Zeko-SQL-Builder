@@ -11,6 +11,8 @@ import kotlinx.coroutines.delay
 import java.lang.Exception
 import java.util.LinkedHashMap
 import io.vertx.ext.sql.ResultSet
+import io.zeko.db.sql.exceptions.DuplicateKeyException
+import io.zeko.db.sql.exceptions.throwDuplicate
 import java.sql.Date
 import java.sql.Time
 import java.sql.Timestamp
@@ -21,6 +23,7 @@ open class VertxDBSession : DBSession {
     protected var dbPool: DBPool
     protected var rawConn: SQLConnection
     protected var logger: DBLogger? = null
+    protected var throwOnDuplicate = true
 
     constructor(dbPool: DBPool, conn: DBConn) {
         this.dbPool = dbPool
@@ -28,11 +31,24 @@ open class VertxDBSession : DBSession {
         rawConn = conn.raw() as SQLConnection
     }
 
+    constructor(dbPool: DBPool, conn: DBConn, throwOnDuplicate: Boolean) {
+        this.dbPool = dbPool
+        this.conn = conn
+        rawConn = conn.raw() as SQLConnection
+        this.throwOnDuplicate = throwOnDuplicate
+    }
+
     override fun pool(): DBPool = dbPool
 
     override fun connection(): DBConn = conn
 
     override fun rawConnection(): SQLConnection = rawConn
+
+    protected fun throwDuplicateException(err: Exception) {
+        if (this.throwOnDuplicate) {
+            throwDuplicate(err)
+        }
+    }
 
     override suspend fun <A> once(operation: suspend (DBSession) -> A): A {
         try {
@@ -50,12 +66,17 @@ open class VertxDBSession : DBSession {
         try {
             operation.invoke(this)
         } catch (e: Exception) {
-            if (numRetries > 0) {
-                if (delayTry > 0) {
-                    delay(delayTry)
+            if (e !is DuplicateKeyException) {
+                if (numRetries > 0) {
+                    if (delayTry > 0) {
+                        delay(delayTry)
+                    }
+                    logger?.logRetry(numRetries, e)
+                    retry(numRetries - 1, delayTry, operation)
+                } else {
+                    logger?.logError(e)
+                    throw e
                 }
-                logger?.logRetry(numRetries, e)
-                retry(numRetries - 1, delayTry, operation)
             } else {
                 logger?.logError(e)
                 throw e
@@ -73,14 +94,20 @@ open class VertxDBSession : DBSession {
             operation.invoke(this)
             conn.commit()
         } catch (e: Exception) {
-            if (numRetries > 0) {
-                conn.rollback()
-                conn.endTx()
-                if (delayTry > 0) {
-                    delay(delayTry)
+            if (e !is DuplicateKeyException) {
+                if (numRetries > 0) {
+                    conn.rollback()
+                    conn.endTx()
+                    if (delayTry > 0) {
+                        delay(delayTry)
+                    }
+                    logger?.logRetry(numRetries, e)
+                    transaction(numRetries - 1, delayTry, operation)
+                } else {
+                    conn.rollback()
+                    logger?.logError(e)
+                    throw e
                 }
-                logger?.logRetry(numRetries, e)
-                transaction(numRetries - 1, delayTry, operation)
             } else {
                 conn.rollback()
                 logger?.logError(e)
@@ -173,6 +200,9 @@ open class VertxDBSession : DBSession {
             affectedRows = updateRes.updated
         } catch (err: java.sql.SQLFeatureNotSupportedException) {
             return affectedRows
+        } catch (err: Exception) {
+            throwDuplicateException(err)
+            throw err
         } finally {
             if (closeConn) conn.close()
         }
@@ -195,6 +225,9 @@ open class VertxDBSession : DBSession {
             if (updateRes != null ) {
                 return updateRes?.keys.toList()
             }
+        } catch (err: Exception) {
+            throwDuplicateException(err)
+            throw err
         } finally {
             if (closeConn) conn.close()
         }
