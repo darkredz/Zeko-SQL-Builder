@@ -3,6 +3,8 @@ package io.zeko.db.sql.connections
 import com.github.jasync.sql.db.*
 import com.github.jasync.sql.db.pool.ConnectionPool
 import com.github.jasync.sql.db.mysql.MySQLQueryResult
+import io.zeko.db.sql.exceptions.DuplicateKeyException
+import io.zeko.db.sql.exceptions.throwDuplicate
 import io.zeko.model.declarations.toMaps
 import kotlinx.coroutines.delay
 import java.lang.Exception
@@ -14,11 +16,19 @@ open class JasyncDBSession : DBSession {
     protected var dbPool: DBPool
     protected var rawConn: Any
     protected var logger: DBLogger? = null
+    protected var throwOnDuplicate = true
 
     constructor(dbPool: DBPool, conn: DBConn) {
         this.dbPool = dbPool
         this.conn = conn
         rawConn = conn.raw()
+    }
+
+    constructor(dbPool: DBPool, conn: DBConn, throwOnDuplicate: Boolean) {
+        this.dbPool = dbPool
+        this.conn = conn
+        rawConn = conn.raw()
+        this.throwOnDuplicate = throwOnDuplicate
     }
 
     override fun pool(): DBPool = dbPool
@@ -58,6 +68,9 @@ open class JasyncDBSession : DBSession {
         } catch (err: java.sql.SQLFeatureNotSupportedException) {
             logger?.logUnsupportedSql(err)
             return affectedRows
+        } catch (err: Exception) {
+            throwDuplicateException(err)
+            throw err
         } finally {
             if (closeConn) conn.close()
         }
@@ -107,6 +120,9 @@ open class JasyncDBSession : DBSession {
                     return listOf(updateRes.lastInsertId)
                 }
             }
+        } catch (err: Exception) {
+            throwDuplicateException(err)
+            throw err
         } finally {
             if (closeConn) conn.close()
         }
@@ -170,6 +186,12 @@ open class JasyncDBSession : DBSession {
         return rows
     }
 
+    protected fun throwDuplicateException(err: Exception) {
+        if (this.throwOnDuplicate) {
+            throwDuplicate(err)
+        }
+    }
+
     override suspend fun <A> once(operation: suspend (DBSession) -> A): A {
         try {
             val result: A = operation.invoke(this)
@@ -186,14 +208,18 @@ open class JasyncDBSession : DBSession {
         try {
             operation.invoke(this)
         } catch (e: Exception) {
-            if (numRetries > 0) {
-                if (delayTry > 0) {
-                    delay(delayTry)
+            if (e !is DuplicateKeyException) {
+                if (numRetries > 0) {
+                    if (delayTry > 0) {
+                        delay(delayTry)
+                    }
+                    logger?.logRetry(numRetries, e)
+                    retry(numRetries - 1, delayTry, operation)
+                } else {
+                    logger?.logError(e)
+                    throw e
                 }
-                logger?.logRetry(numRetries, e)
-                retry(numRetries - 1, delayTry, operation)
             } else {
-                logger?.logError(e)
                 throw e
             }
         } finally {
@@ -210,14 +236,18 @@ open class JasyncDBSession : DBSession {
                 operation.invoke(JasyncDBSession(JasyncDBPool(rawConnection()), JasyncSuspendingDBConn(it)))
             }
         } catch (e: Exception) {
-            if (numRetries > 0) {
-                if (delayTry > 0) {
-                    delay(delayTry)
+            if (e !is DuplicateKeyException) {
+                if (numRetries > 0) {
+                    if (delayTry > 0) {
+                        delay(delayTry)
+                    }
+                    logger?.logRetry(numRetries, e)
+                    transaction(numRetries - 1, delayTry, operation)
+                } else {
+                    logger?.logError(e)
+                    throw e
                 }
-                logger?.logRetry(numRetries, e)
-                transaction(numRetries - 1, delayTry, operation)
             } else {
-                logger?.logError(e)
                 throw e
             }
         } finally {

@@ -452,6 +452,20 @@ pool.setInsertStatementMode(Statement.RETURN_GENERATED_KEYS)
 Note: Not all database works with this, for instance Apache Ignite will throw exception since it does not support this SQL feature.
 Jasync driver on the other hand [only works with MySQL](https://github.com/jasync-sql/jasync-sql/wiki/FAQ#q-i-inserted-a-row-how-do-i-get-an-auto-incremented-id) (this high performance non-blocking driver is for MySQL and PostgreSQL only)
 
+#### Duplicate Entries
+If you have inserted/updated a duplicated entry due to unique index or primary key, the DB client will throw DuplicateKeyException by default.
+```kotlin
+import io.zeko.db.sql.exceptions.DuplicateKeyException
+
+try {
+    conn.insert(sqlInsert, listOf("User Name", "abc@gmail.com"))
+} catch (err: DuplicateKeyException) {
+    if (err.equals("email")) {
+        println("email column: Email address is already registered")
+    }
+}
+```
+
 #### More controls on connection
 To execute the queries with more control you can get the underlying connection object by calling rawConnection:
 ```kotlin
@@ -680,6 +694,6 @@ Add this to your maven pom.xml
     <dependency>
       <groupId>io.zeko</groupId>
       <artifactId>zeko-sql-builder</artifactId>
-      <version>1.1.2</version>
+      <version>1.1.3</version>
     </dependency>
     
