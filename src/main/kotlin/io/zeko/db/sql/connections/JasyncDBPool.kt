@@ -59,9 +59,21 @@ class JasyncDBPool : DBPool {
             port = config["port"]!!.toInt()
             database = config["database"]!!
             username = config["user"]!!
+            charset = charset
             if (config.containsKey("password"))
                 password = config["password"]!!
-            charset = charset
+            if (config.containsKey("queryTimeout"))
+                queryTimeout = config["queryTimeout"].toString().toLong()
+            if (config.containsKey("maxIdleTime"))
+                maxIdleTime = config["queryTimeout"].toString().toLong()
+            if (config.containsKey("maxConnectionTtl"))
+                maxConnectionTtl = config["maxConnectionTtl"].toString().toLong()
+            if (config.containsKey("maxActiveConnections"))
+                maxActiveConnections = config["maxActiveConnections"].toString().toInt()
+            if (config.containsKey("maxPendingQueries"))
+                maxPendingQueries = config["maxPendingQueries"].toString().toInt()
+            if (config.containsKey("maximumMessageSize"))
+                maximumMessageSize = config["maximumMessageSize"].toString().toInt()
         }
         return (databaseType to dbConfig)
     }
