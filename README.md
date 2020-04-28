@@ -694,6 +694,6 @@ Add this to your maven pom.xml
     <dependency>
       <groupId>io.zeko</groupId>
       <artifactId>zeko-sql-builder</artifactId>
-      <version>1.1.3</version>
+      <version>1.1.4</version>
     </dependency>
     
