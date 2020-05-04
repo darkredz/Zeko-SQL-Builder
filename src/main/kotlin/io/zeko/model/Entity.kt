@@ -146,6 +146,22 @@ abstract class Entity {
         return converted
     }
 
+    open fun toParams(valueHandler: ((String, Any?) -> Any?)? = null): List<Any?> {
+        val entries = dataMap().entries
+        val params = arrayListOf<Any?>()
+        entries.forEach { prop ->
+            if (valueHandler != null) {
+                params.add(valueHandler(prop.key, prop.value))
+            } else {
+                when (prop.value) {
+                    is Enum<*> -> params.add((prop.value as Enum<*>).name)
+                    else -> params.add(prop.value)
+                }
+            }
+        }
+        return params
+    }
+
     override fun toString(): String {
         var str = this.tableName() + " { "
         dataMap().entries.forEach {
