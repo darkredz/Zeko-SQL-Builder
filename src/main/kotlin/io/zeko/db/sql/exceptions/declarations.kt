@@ -33,6 +33,22 @@ fun throwDuplicate(err: Exception) {
             column = if (parts[0] == "key") "PRIMARY" else parts[0]
             entry = parts[1]
         }
+        //Postgres
+        else if (err.message!!.contains("duplicate key value violates")) {
+            val rgxFindField = "\\\"([^\\\"]+)\\\"".toPattern()
+            val matcher = rgxFindField.matcher(err.message)
+            while (matcher.find()) {
+                column = matcher.group(1)
+                break
+            }
+
+            val rgxFindEntry = "\\(([^\\)]+)\\) already exists".toPattern()
+            val matcherEntry = rgxFindEntry.matcher(err.message)
+            while (matcherEntry.find()) {
+                entry = matcherEntry.group(1)
+                break
+            }
+        }
 
         throw DuplicateKeyException(column + "", entry + "", err.message)
     }
