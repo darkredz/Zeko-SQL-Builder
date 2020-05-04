@@ -250,7 +250,7 @@ Insert(User(), "id", "name").select(
 ```
 
 #### Parameterize Query for Insert/Update
-Pass true as the second parameter to Insert/Update will generate SQL with *?*. 
+Pass true as the second parameter to Insert/Update will generate SQL with *?*
 
 Use *Entity::toParams()* method to get the list of values to be used with your DB client for a prepared statement DML 
 
@@ -261,6 +261,9 @@ val user = User().apply {
            }
 Insert(user, true).toSql()
 // INSERT INTO user ( name, age ) VALUES ( ?, ? )
+
+println(user.toParams())
+// 'Leng', 21
 ```
 
 If your entity has properties with custom classes such as Enum, override toParams() method to return the value type needed to store in your RDBMS:
@@ -274,7 +277,8 @@ enum class RoleType(val type: Int) {
 class User : Entity {
     // ... code as User class above ...
     var roleType: RoleType?     by map
-    // Override toParams to convert role type Enum into int to be stored in the Table role_type column (TINYINT/Int)
+    // Override toParams to convert role type Enum into int 
+    // to be stored in the Table role_type column (TinyInt/Int)
     override fun toParams(valueHandler: ((String, Any?) -> Any?)?): List<Any?> {
         return super.toParams { key, value ->
             when (key) {
