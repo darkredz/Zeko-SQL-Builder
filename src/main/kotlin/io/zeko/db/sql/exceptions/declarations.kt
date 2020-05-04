@@ -3,19 +3,53 @@ package io.zeko.db.sql.exceptions
 import java.lang.Exception
 
 fun throwDuplicate(err: Exception) {
-    if (err.message!!.contains("Duplicate")) {
-        val rgxFindField = "\\'([^\\']+)\\'".toPattern()
-        val matcher = rgxFindField.matcher(err.message)
+    if (err.message!!.contains("duplicate", true)) {
         var column: String? = null
         var entry: String? = null
 
-        while (matcher.find()) {
-            if (entry == null) {
-                entry = matcher.group(1)
-            } else {
-                column = matcher.group(1)
+        //MySQL
+        if (err.message!!.contains("Duplicate entry '")) {
+            val rgxFindField = "\\'([^\\']+)\\'".toPattern()
+            val matcher = rgxFindField.matcher(err.message)
+
+            while (matcher.find()) {
+                if (entry == null) {
+                    entry = matcher.group(1)
+                } else {
+                    column = matcher.group(1)
+                }
             }
         }
-        throw DuplicateKeyException(column + "", entry+ "", err.message)
+        //Apache Ignite/Ansi
+        else if (err.message!!.startsWith("Duplicate key during")) {
+            val rgxFindField = "\\[([^\\[\\]]+)\\]".toPattern()
+            val matcher = rgxFindField.matcher(err.message)
+            var str = ""
+            while (matcher.find()) {
+                str = matcher.group(1)
+                break
+            }
+            val parts = str.removePrefix("[").removeSuffix("]").split("\\=".toRegex(), 2)
+            column = if (parts[0] == "key") "PRIMARY" else parts[0]
+            entry = parts[1]
+        }
+        //Postgres
+        else if (err.message!!.contains("duplicate key value violates")) {
+            val rgxFindField = "\\\"([^\\\"]+)\\\"".toPattern()
+            val matcher = rgxFindField.matcher(err.message)
+            while (matcher.find()) {
+                column = matcher.group(1)
+                break
+            }
+
+            val rgxFindEntry = "\\(([^\\)]+)\\) already exists".toPattern()
+            val matcherEntry = rgxFindEntry.matcher(err.message)
+            while (matcherEntry.find()) {
+                entry = matcherEntry.group(1)
+                break
+            }
+        }
+
+        throw DuplicateKeyException(column + "", entry + "", err.message)
     }
 }

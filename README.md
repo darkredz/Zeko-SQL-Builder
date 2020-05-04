@@ -249,6 +249,53 @@ Insert(User(), "id", "name").select(
 // DELETE FROM users WHERE id > 100 AND age < 80 AND name = ?
 ```
 
+#### Parameterize Query for Insert/Update
+Pass true as the second parameter to Insert/Update will generate SQL with *?*. 
+
+Use *Entity::toParams()* method to get the list of values to be used with your DB client for a prepared statement DML 
+
+```kotlin
+val user = User().apply {
+               name = "Leng"
+               age = 21
+           }
+Insert(user, true).toSql()
+// INSERT INTO user ( name, age ) VALUES ( ?, ? )
+```
+
+If your entity has properties with custom classes such as Enum, override toParams() method to return the value type needed to store in your RDBMS:
+```kotlin
+enum class RoleType(val type: Int) {
+    ADMIN(1),
+    NORMAL_USER(2),
+    MODERATOR(3)
+}
+
+class User : Entity {
+    // ... code as User class above ...
+    var roleType: RoleType?     by map
+    // Override toParams to convert role type Enum into int to be stored in the Table role_type column (TINYINT/Int)
+    override fun toParams(valueHandler: ((String, Any?) -> Any?)?): List<Any?> {
+        return super.toParams { key, value ->
+            when (key) {
+                "roleType" -> (value as RoleType).type
+                else -> value
+            }
+        }
+    }
+}
+
+val user = User().apply {
+               name = "Leng"
+               roleType = RoleType.ADMIN
+           }
+Insert(user, true).toSql()
+// INSERT INTO user ( name, role_type ) VALUES ( ?, ? )
+
+println(user.toParams())
+// 'Leng', 1
+```
+
 ## Where Expression
 Query expression (where) allowed conditions are:
 ```
@@ -694,6 +741,28 @@ Add this to your maven pom.xml
     <dependency>
       <groupId>io.zeko</groupId>
       <artifactId>zeko-sql-builder</artifactId>
-      <version>1.1.4</version>
+      <version>1.1.5</version>
     </dependency>
-    
+    <!-- Jasync Mysql driver if needed -->
+    <dependency>
+       <groupId>com.github.jasync-sql</groupId>
+       <artifactId>jasync-mysql</artifactId>
+       <version>1.0.17</version>
+    </dependency>
+    <!-- Hikari Mysql connection pool if needed -->
+    <dependency>
+        <groupId>com.zaxxer</groupId>
+        <artifactId>HikariCP</artifactId>
+        <version>3.4.3</version>
+    </dependency>
+    <!-- Vertx jdbc client if needed -->
+    <dependency>
+        <groupId>io.vertx</groupId>
+        <artifactId>vertx-jdbc-client</artifactId>
+        <version>${vertx.version}</version>
+    </dependency>
+    <dependency>
+        <groupId>org.jetbrains.kotlinx</groupId>
+        <artifactId>kotlinx-coroutines-core</artifactId>
+        <version>1.3.3</version>
+    </dependency>
