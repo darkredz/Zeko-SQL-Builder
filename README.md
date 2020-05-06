@@ -198,7 +198,7 @@ Query().fields("id", "name", "age")
     ).toSql()
 ```
 
-## Insert, Update and Delete statements
+## Insert, Update, Merge and Delete statements
 Zeko sql builder only supports DML at the moment. To build any insert, update and delete statement, you have to create an Entity class for your table.
 
 ```kotlin
@@ -247,10 +247,17 @@ Insert(User(), "id", "name").select(
     "name" eq "Leng"
 ).toSql()
 // DELETE FROM users WHERE id > 100 AND age < 80 AND name = ?
+
+
+Merge(User().apply {
+    id = 2
+    name = "Leng"
+}).toSql()
+// INSERT INTO user ( id, name ) VALUES ( 2, 'Leng' )
 ```
 
-#### Parameterize Query for Insert/Update
-Pass true as the second parameter to Insert/Update will generate SQL with *?*
+#### Parameterize Query for Insert/Update/Merge
+Pass true as the second parameter to Insert/Update/Merge will generate SQL with *?*
 
 Use *Entity::toParams()* method to get the list of values to be used with your DB client for a prepared statement DML 
 
@@ -745,8 +752,9 @@ Add this to your maven pom.xml
     <dependency>
       <groupId>io.zeko</groupId>
       <artifactId>zeko-sql-builder</artifactId>
-      <version>1.1.5</version>
+      <version>1.1.6</version>
     </dependency>
+    
     <!-- Jasync Mysql driver if needed -->
     <dependency>
        <groupId>com.github.jasync-sql</groupId>
