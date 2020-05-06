@@ -109,9 +109,17 @@ abstract class Entity {
                     if (dateStr.indexOf("T") > 0) {
                         pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
                     } else {
-                        pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SXXX")
+                        // Apache ignite returns "2020-05-06 17:15:03.322Z" for timestamp columns
+                        if (dateStr.length > 21 && dateStr[19] + "" == "." && dateStr[21] + "" != "Z") {
+                            pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSXXX")
+                        } else {
+                            pattern = if (dateStr.indexOf(".") > 0)
+                                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SXXX")
+                            else
+                                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ssXXX")
+                        }
                     }
-                    ZonedDateTime.parse(dateStr + "Z", pattern)
+                    ZonedDateTime.parse(dateStr.removeSuffix("Z") + "Z", pattern)
                 } else {
                     //Vertx JDBC client returns date time field as String and already converted to UTC
                     val pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")
