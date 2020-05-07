@@ -35,6 +35,14 @@ fun neq(field: String, value: Long): QueryBlock {
     return QueryBlock(field, "!=", value.toString())
 }
 
+fun eq(field: String, value: Any): QueryBlock {
+    return QueryBlock(field, "=", "?")
+}
+
+fun neq(field: String, value: Any): QueryBlock {
+    return QueryBlock(field, "!=", "?")
+}
+
 fun greater(field: String, field2: String): QueryBlock {
     return QueryBlock(field, ">", field2)
 }
@@ -85,6 +93,19 @@ fun less(field: String, value: Double): QueryBlock {
 }
 fun lessEq(field: String, value: Double): QueryBlock {
     return QueryBlock(field, "<=", value.toString())
+}
+
+fun greater(field: String, value: Any): QueryBlock {
+    return QueryBlock(field, ">", "?")
+}
+fun greaterEq(field: String, value: Any): QueryBlock {
+    return QueryBlock(field, ">=", "?")
+}
+fun less(field: String, value: Any): QueryBlock {
+    return QueryBlock(field, "<", "?")
+}
+fun lessEq(field: String, value: Any): QueryBlock {
+    return QueryBlock(field, "<=", "?")
 }
 
 fun like(field: String, value: String, useRawValue: Boolean = false): QueryBlock {
