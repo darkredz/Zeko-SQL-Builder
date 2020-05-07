@@ -288,6 +288,9 @@ infix fun String.between(values: Pair<*, *>): QueryBlock {
     } else if (value1 is Double) {
         val value2 = values.second as Double
         return io.zeko.db.sql.operators.between(this, value1, value2)
+    } else {
+        val value2 = values.second
+        return io.zeko.db.sql.operators.between(this, value1.toString(), value2.toString())
     }
     return QueryBlock("", "")
 }
