@@ -19,6 +19,10 @@ infix fun String.eq(value: Double): QueryBlock {
     return io.zeko.db.sql.operators.eq(this, value)
 }
 
+infix fun String.eq(value: Any): QueryBlock {
+    return io.zeko.db.sql.operators.eq(this, value)
+}
+
 infix fun String.neq(value: String): QueryBlock {
     return io.zeko.db.sql.operators.neq(this, value)
 }
@@ -32,6 +36,10 @@ infix fun String.neq(value: Long): QueryBlock {
 }
 
 infix fun String.neq(value: Double): QueryBlock {
+    return io.zeko.db.sql.operators.neq(this, value)
+}
+
+infix fun String.neq(value: Any): QueryBlock {
     return io.zeko.db.sql.operators.neq(this, value)
 }
 
@@ -99,102 +107,141 @@ infix fun String.lessEq(value: Double): QueryBlock {
     return io.zeko.db.sql.operators.lessEq(this, value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.eq(value: String): QueryBlock {
+infix fun String.greater(value: Any): QueryBlock {
+    return io.zeko.db.sql.operators.greater(this, value)
+}
+
+infix fun String.greaterEq(value: Any): QueryBlock {
+    return io.zeko.db.sql.operators.greaterEq(this, value)
+}
+
+infix fun String.less(value: Any): QueryBlock {
+    return io.zeko.db.sql.operators.less(this, value)
+}
+
+infix fun String.lessEq(value: Any): QueryBlock {
+    return io.zeko.db.sql.operators.lessEq(this, value)
+}
+
+infix fun QueryBlock.eq(value: String): QueryBlock {
     return io.zeko.db.sql.operators.eq(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.eq(value: Int): QueryBlock {
+infix fun QueryBlock.eq(value: Int): QueryBlock {
     return io.zeko.db.sql.operators.eq(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.eq(value: Long): QueryBlock {
+infix fun QueryBlock.eq(value: Long): QueryBlock {
     return io.zeko.db.sql.operators.eq(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.eq(value: Double): QueryBlock {
+infix fun QueryBlock.eq(value: Double): QueryBlock {
     return io.zeko.db.sql.operators.eq(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.neq(value: String): QueryBlock {
+infix fun QueryBlock.eq(value: Any): QueryBlock {
+    return io.zeko.db.sql.operators.eq(this.toString(), value)
+}
+
+infix fun QueryBlock.neq(value: String): QueryBlock {
     return io.zeko.db.sql.operators.neq(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.neq(value: Int): QueryBlock {
+infix fun QueryBlock.neq(value: Int): QueryBlock {
     return io.zeko.db.sql.operators.neq(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.neq(value: Long): QueryBlock {
+infix fun QueryBlock.neq(value: Long): QueryBlock {
     return io.zeko.db.sql.operators.neq(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.neq(value: Double): QueryBlock {
+infix fun QueryBlock.neq(value: Double): QueryBlock {
     return io.zeko.db.sql.operators.neq(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.greater(value: String): QueryBlock {
+infix fun QueryBlock.neq(value: Any): QueryBlock {
+    return io.zeko.db.sql.operators.neq(this.toString(), value)
+}
+
+infix fun QueryBlock.greater(value: String): QueryBlock {
     return io.zeko.db.sql.operators.greater(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.greaterEq(value: String): QueryBlock {
+infix fun QueryBlock.greaterEq(value: String): QueryBlock {
     return io.zeko.db.sql.operators.greaterEq(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.less(value: String): QueryBlock {
+infix fun QueryBlock.less(value: String): QueryBlock {
     return io.zeko.db.sql.operators.less(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.lessEq(value: String): QueryBlock {
+infix fun QueryBlock.lessEq(value: String): QueryBlock {
     return io.zeko.db.sql.operators.lessEq(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.greater(value: Int): QueryBlock {
+infix fun QueryBlock.greater(value: Int): QueryBlock {
     return io.zeko.db.sql.operators.greater(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.greaterEq(value: Int): QueryBlock {
+infix fun QueryBlock.greaterEq(value: Int): QueryBlock {
     return io.zeko.db.sql.operators.greaterEq(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.less(value: Int): QueryBlock {
+infix fun QueryBlock.less(value: Int): QueryBlock {
     return io.zeko.db.sql.operators.less(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.lessEq(value: Int): QueryBlock {
+infix fun QueryBlock.lessEq(value: Int): QueryBlock {
     return io.zeko.db.sql.operators.lessEq(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.greater(value: Long): QueryBlock {
+infix fun QueryBlock.greater(value: Long): QueryBlock {
     return io.zeko.db.sql.operators.greater(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.greaterEq(value: Long): QueryBlock {
+infix fun QueryBlock.greaterEq(value: Long): QueryBlock {
     return io.zeko.db.sql.operators.greaterEq(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.less(value: Long): QueryBlock {
+infix fun QueryBlock.less(value: Long): QueryBlock {
     return io.zeko.db.sql.operators.less(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.lessEq(value: Long): QueryBlock {
+infix fun QueryBlock.lessEq(value: Long): QueryBlock {
     return io.zeko.db.sql.operators.lessEq(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.greater(value: Double): QueryBlock {
+infix fun QueryBlock.greater(value: Double): QueryBlock {
     return io.zeko.db.sql.operators.greater(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.greaterEq(value: Double): QueryBlock {
+infix fun QueryBlock.greaterEq(value: Double): QueryBlock {
     return io.zeko.db.sql.operators.greaterEq(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.less(value: Double): QueryBlock {
+infix fun QueryBlock.less(value: Double): QueryBlock {
     return io.zeko.db.sql.operators.less(this.toString(), value)
 }
 
-infix fun io.zeko.db.sql.QueryBlock.lessEq(value: Double): QueryBlock {
+infix fun QueryBlock.lessEq(value: Double): QueryBlock {
     return io.zeko.db.sql.operators.lessEq(this.toString(), value)
 }
 
+infix fun QueryBlock.greater(value: Any): QueryBlock {
+    return io.zeko.db.sql.operators.greater(this.toString(), value)
+}
+
+infix fun QueryBlock.greaterEq(value: Any): QueryBlock {
+    return io.zeko.db.sql.operators.greaterEq(this.toString(), value)
+}
+
+infix fun QueryBlock.less(value: Any): QueryBlock {
+    return io.zeko.db.sql.operators.less(this.toString(), value)
+}
+
+infix fun QueryBlock.lessEq(value: Any): QueryBlock {
+    return io.zeko.db.sql.operators.lessEq(this.toString(), value)
+}
 
 infix fun String.like(value: String): QueryBlock {
     return io.zeko.db.sql.operators.like(this, value)
@@ -224,14 +271,14 @@ infix fun String.isNotNull(value: Boolean): QueryBlock {
     if (value) {
         return io.zeko.db.sql.operators.isNotNull(this)
     }
-    return io.zeko.db.sql.QueryBlock("", "")
+    return QueryBlock("", "")
 }
 
 infix fun String.isNull(value: Boolean): QueryBlock {
     if (value) {
         return io.zeko.db.sql.operators.isNull(this)
     }
-    return io.zeko.db.sql.QueryBlock("", "")
+    return QueryBlock("", "")
 }
 
 infix fun String.inList(values: String): QueryBlock {
@@ -288,6 +335,9 @@ infix fun String.between(values: Pair<*, *>): QueryBlock {
     } else if (value1 is Double) {
         val value2 = values.second as Double
         return io.zeko.db.sql.operators.between(this, value1, value2)
+    } else {
+        val value2 = values.second
+        return io.zeko.db.sql.operators.between(this, value1.toString(), value2.toString())
     }
     return QueryBlock("", "")
 }
