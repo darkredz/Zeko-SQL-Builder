@@ -96,11 +96,15 @@ abstract class Entity {
                     //Vertx JDBC client returns date time field as String and already converted to UTC
                     val pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")
                     val systemZoneDateTime = ZonedDateTime.parse(value, pattern).withZoneSameInstant(ZoneId.systemDefault())
-                    return systemZoneDateTime.toLocalDateTime()
+                    systemZoneDateTime.toLocalDateTime()
                 }
             }
             Type.DATE -> {
-                LocalDate.parse(value.toString())
+                if (value is java.util.Date) {
+                    value.toInstant().atZone(ZoneId.systemDefault()).toLocalDate()
+                } else {
+                    LocalDate.parse(value.toString())
+                }
             }
             Type.ZONEDATETIME_UTC -> {
                 if (value !is String) {
