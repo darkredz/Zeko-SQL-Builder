@@ -752,14 +752,14 @@ Add this to your maven pom.xml
     <dependency>
       <groupId>io.zeko</groupId>
       <artifactId>zeko-sql-builder</artifactId>
-      <version>1.1.8</version>
+      <version>1.2.0</version>
     </dependency>
     
     <!-- Jasync Mysql driver if needed -->
     <dependency>
        <groupId>com.github.jasync-sql</groupId>
        <artifactId>jasync-mysql</artifactId>
-       <version>1.0.17</version>
+       <version>1.1.3</version>
     </dependency>
     <!-- Hikari Mysql connection pool if needed -->
     <dependency>
