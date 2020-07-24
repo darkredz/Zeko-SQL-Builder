@@ -105,7 +105,7 @@ open class JasyncDBSession : DBSession {
             logger?.logQuery(sql, params)
             updateRes = suspendingConn().sendPreparedStatement(sql, convertParams(params))
             val affectedRows = updateRes.rowsAffected.toInt()
-            println("affectedRows $affectedRows")
+
             if (affectedRows == 0) {
                 return listOf<Void>()
             }
