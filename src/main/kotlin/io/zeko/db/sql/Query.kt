@@ -353,6 +353,11 @@ open class Query {
         return this
     }
 
+    fun groupByMain(vararg fields: String): Query {
+        addExpressionAfter(CustomPart.WHERE, QueryBlock("GROUP BY", if (fields.size == 1) fields[0] else fields.joinToString(", ")))
+        return this
+    }
+
     fun groupBy(vararg fields: String): Query {
         groupBys.addAll(fields as Array<String>)
         return this
