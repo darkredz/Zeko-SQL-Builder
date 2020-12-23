@@ -94,7 +94,7 @@ abstract class Entity {
                     LocalDateTime.parse(dateStr, pattern)
                 } else {
                     //Vertx JDBC client returns date time field as String and already converted to UTC
-                    val pattern = if (value.indexOf("Z") === value.length - 1 && value.indexOf(".") === value.length - 5) {
+                    val pattern = if (value.indexOf("Z") == value.length - 1 && value.indexOf(".") == value.length - 5) {
                         DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSz")
                     } else {
                         DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")
@@ -130,7 +130,7 @@ abstract class Entity {
                     ZonedDateTime.parse(dateStr.removeSuffix("Z") + "Z", pattern)
                 } else {
                     //Vertx JDBC client returns date time field as String and already converted to UTC
-                    val pattern = if (value.indexOf("Z") === value.length - 1 && value.indexOf(".") === value.length - 5) {
+                    val pattern = if (value.indexOf("Z") == value.length - 1 && value.indexOf(".") == value.length - 5) {
                         DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSz")
                     } else {
                         DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")
@@ -152,7 +152,7 @@ abstract class Entity {
                     LocalDateTime.parse(dateStr, pattern).atZone(ZoneOffset.UTC).toInstant()
                 } else {
                     //Vertx JDBC client returns date time field as String and already converted to UTC
-                    val pattern = if (value.indexOf("Z") === value.length - 1 && value.indexOf(".") === value.length - 5) {
+                    val pattern = if (value.indexOf("Z") == value.length - 1 && value.indexOf(".") == value.length - 5) {
                         DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSz")
                     } else {
                         DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")
