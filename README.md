@@ -759,13 +759,13 @@ Add this to your maven pom.xml
     <dependency>
        <groupId>com.github.jasync-sql</groupId>
        <artifactId>jasync-mysql</artifactId>
-       <version>1.1.3</version>
+       <version>1.1.5</version>
     </dependency>
     <!-- Hikari Mysql connection pool if needed -->
     <dependency>
         <groupId>com.zaxxer</groupId>
         <artifactId>HikariCP</artifactId>
-        <version>3.4.3</version>
+        <version>3.4.5</version>
     </dependency>
     <!-- Vertx jdbc client if needed -->
     <dependency>
