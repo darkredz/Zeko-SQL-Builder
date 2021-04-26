@@ -175,13 +175,17 @@ abstract class Entity {
     open fun toParams(valueHandler: ((String, Any?) -> Any?)? = null): List<Any?> {
         val entries = dataMap().entries
         val params = arrayListOf<Any?>()
+        val ignores = ignoreFields()
+
         entries.forEach { prop ->
-            if (valueHandler != null) {
-                params.add(valueHandler(prop.key, prop.value))
-            } else {
-                when (prop.value) {
-                    is Enum<*> -> params.add((prop.value as Enum<*>).name)
-                    else -> params.add(prop.value)
+            if (!(ignores.isNotEmpty() && ignores.indexOf(prop.key) > -1)) {
+                if (valueHandler != null) {
+                    params.add(valueHandler(prop.key, prop.value))
+                } else {
+                    when (prop.value) {
+                        is Enum<*> -> params.add((prop.value as Enum<*>).name)
+                        else -> params.add(prop.value)
+                    }
                 }
             }
         }
