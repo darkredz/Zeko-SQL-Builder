@@ -35,7 +35,9 @@ open class Merge : DataManipulation {
 
         if (entity.dataMap().isNotEmpty()) {
             val entries = entity.dataMap().entries
+            val ignores = entity.ignoreFields()
             for ((propName, value) in entries) {
+                if (ignores.isNotEmpty() && ignores.indexOf(propName) > -1) continue
                 val prop = propName.toSnakeCase()
                 if (shouldIgnoreType(value)) continue
                 columns.add(prop)

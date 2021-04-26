@@ -27,6 +27,8 @@ abstract class Entity {
         this.map = mutableMapOf(*props).withDefault { null }
     }
 
+    open fun ignoreFields(): List<String> = listOf()
+
     open fun tableName(): String = ""
 
     open fun dataMap(): MutableMap<String, Any?> = map
