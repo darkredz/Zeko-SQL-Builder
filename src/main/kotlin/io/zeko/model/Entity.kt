@@ -29,6 +29,14 @@ abstract class Entity {
 
     open fun ignoreFields(): List<String> = listOf()
 
+    open fun copyDataMap(map: Map<String, Any?>) {
+        this.map = map.toMutableMap()
+    }
+
+    open fun copyDataMap(entity: Entity) {
+        this.map = entity.dataMap().toMutableMap()
+    }
+
     open fun tableName(): String = ""
 
     open fun dataMap(): MutableMap<String, Any?> = map
