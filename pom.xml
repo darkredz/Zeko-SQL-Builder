@@ -146,12 +146,12 @@
         <dependency>
             <groupId>com.github.jasync-sql</groupId>
             <artifactId>jasync-postgresql</artifactId>
-            <version>1.1.5</version>
+            <version>1.2.3</version>
         </dependency>
         <dependency>
             <groupId>com.github.jasync-sql</groupId>
             <artifactId>jasync-mysql</artifactId>
-            <version>1.1.5</version>
+            <version>1.2.3</version>
         </dependency>
         <dependency>
             <groupId>io.zeko</groupId>
