@@ -233,7 +233,9 @@ open class JasyncDBSession : DBSession {
         val conn = suspendingConn()
         try {
             conn.inTransaction {
-                operation.invoke(JasyncDBSession(JasyncDBPool(rawConnection()), JasyncSuspendingDBConn(it)))
+                val sess = JasyncDBSession(JasyncDBPool(rawConnection()), JasyncSuspendingDBConn(it))
+                if (logger != null) sess.setQueryLogger(logger!!)
+                operation.invoke(sess)
             }
         } catch (e: Exception) {
             if (e !is DuplicateKeyException) {
@@ -260,14 +262,18 @@ open class JasyncDBSession : DBSession {
     override suspend fun <A> transaction(operation: suspend (DBSession) -> A): A {
         val conn = suspendingConn()
         return conn.inTransaction {
-            operation.invoke(JasyncDBSession(JasyncDBPool(rawConnection()), JasyncSuspendingDBConn(it)))
+            val sess = JasyncDBSession(JasyncDBPool(rawConnection()), JasyncSuspendingDBConn(it))
+            if (logger != null) sess.setQueryLogger(logger!!)
+            operation.invoke(sess)
         }
     }
 
     override suspend fun <A> transactionOpen(operation: suspend (DBSession) -> A): A {
         val conn = suspendingConn()
         return conn.inTransaction {
-            operation.invoke(JasyncDBSession(JasyncDBPool(rawConnection()), JasyncSuspendingDBConn(it)))
+            val sess = JasyncDBSession(JasyncDBPool(rawConnection()), JasyncSuspendingDBConn(it))
+            if (logger != null) sess.setQueryLogger(logger!!)
+            operation.invoke(sess)
         }
     }
 
