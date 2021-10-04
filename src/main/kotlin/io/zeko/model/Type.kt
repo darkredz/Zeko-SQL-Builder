@@ -9,6 +9,8 @@ enum class Type {
     DATETIME,
     DATE,
     ZONEDATETIME_UTC,
+    ZONEDATETIME_SYS,
     DATETIME_UTC,
+    DATETIME_SYS,
     DATE_UTC
 }

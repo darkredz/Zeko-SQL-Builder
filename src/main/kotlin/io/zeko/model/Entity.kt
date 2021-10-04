@@ -27,6 +27,16 @@ abstract class Entity {
         this.map = mutableMapOf(*props).withDefault { null }
     }
 
+    open fun ignoreFields(): List<String> = listOf()
+
+    open fun copyDataMap(map: Map<String, Any?>) {
+        this.map = map.toMutableMap()
+    }
+
+    open fun copyDataMap(entity: Entity) {
+        this.map = entity.dataMap().toMutableMap()
+    }
+
     open fun tableName(): String = ""
 
     open fun dataMap(): MutableMap<String, Any?> = map
@@ -111,56 +121,16 @@ abstract class Entity {
                 }
             }
             Type.ZONEDATETIME_UTC -> {
-                if (value !is String) {
-                    val dateStr = value.toString()
-                    var pattern: DateTimeFormatter
-                    if (dateStr.indexOf("T") > 0) {
-                        pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
-                    } else {
-                        // Apache ignite returns "2020-05-06 17:15:03.322Z" for timestamp columns
-                        if (dateStr.length > 21 && dateStr[19] + "" == "." && dateStr[21] + "" != "Z") {
-                            pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSXXX")
-                        } else {
-                            pattern = if (dateStr.indexOf(".") > 0)
-                                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SXXX")
-                            else
-                                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ssXXX")
-                        }
-                    }
-                    ZonedDateTime.parse(dateStr.removeSuffix("Z") + "Z", pattern)
-                } else {
-                    //Vertx JDBC client returns date time field as String and already converted to UTC
-                    val pattern = if (value.indexOf("Z") == value.length - 1 && value.indexOf(".") == value.length - 5) {
-                        DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSz")
-                    } else {
-                        DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")
-                    }
-                    val systemZoneDateTime = ZonedDateTime.parse(value, pattern).withZoneSameInstant(ZoneId.systemDefault())
-                    val local = systemZoneDateTime.toLocalDateTime()
-                    ZonedDateTime.of(local, ZoneId.of("UTC"))
-                }
+                convertZoneDateTime(value)
+            }
+            Type.ZONEDATETIME_SYS -> {
+                convertZoneDateTime(value, true)
             }
             Type.DATETIME_UTC -> {
-                if (value !is String) {
-                    val dateStr = value.toString()
-                    var pattern: DateTimeFormatter
-                    if (dateStr.indexOf("T") > 0) {
-                        pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS")
-                    } else {
-                        pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.S")
-                    }
-                    LocalDateTime.parse(dateStr, pattern).atZone(ZoneOffset.UTC).toInstant()
-                } else {
-                    //Vertx JDBC client returns date time field as String and already converted to UTC
-                    val pattern = if (value.indexOf("Z") == value.length - 1 && value.indexOf(".") == value.length - 5) {
-                        DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSz")
-                    } else {
-                        DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")
-                    }
-                    val systemZoneDateTime = ZonedDateTime.parse(value, pattern).withZoneSameInstant(ZoneId.systemDefault())
-                    val local = systemZoneDateTime.toLocalDateTime()
-                    ZonedDateTime.of(local, ZoneId.of("UTC")).toInstant()
-                }
+                convertZoneDateTime(value).toInstant()
+            }
+            Type.DATETIME_SYS -> {
+                convertZoneDateTime(value, true).toInstant()
             }
             Type.DATE_UTC -> {
                 LocalDate.parse(value.toString()).atStartOfDay().toInstant(ZoneOffset.UTC)
@@ -170,16 +140,52 @@ abstract class Entity {
         return converted
     }
 
+    fun convertZoneDateTime(value: Any, useSystem: Boolean = false): ZonedDateTime {
+        if (value !is String) {
+            val dateStr = value.toString()
+            var pattern: DateTimeFormatter
+            if (dateStr.indexOf("T") > 0) {
+                pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
+            } else {
+                // Apache ignite returns "2020-05-06 17:15:03.322Z" for timestamp columns
+                if (dateStr.length > 21 && dateStr[19] + "" == "." && dateStr[21] + "" != "Z") {
+                    pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSXXX")
+                } else {
+                    pattern = if (dateStr.indexOf(".") > 0)
+                        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SXXX")
+                    else
+                        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ssXXX")
+                }
+            }
+            return ZonedDateTime.parse(dateStr.removeSuffix("Z") + "Z", pattern)
+        }
+
+        //Vertx JDBC client returns date time field as String and already converted to UTC
+        val pattern = if (value.indexOf("Z") == value.length - 1 && value.indexOf(".") == value.length - 5) {
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSz")
+        } else {
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")
+        }
+
+        val systemZoneDateTime = ZonedDateTime.parse(value, pattern).withZoneSameInstant(ZoneId.systemDefault())
+        if (useSystem) return systemZoneDateTime
+        return systemZoneDateTime.withZoneSameInstant(ZoneId.of("UTC"))
+    }
+
     open fun toParams(valueHandler: ((String, Any?) -> Any?)? = null): List<Any?> {
         val entries = dataMap().entries
         val params = arrayListOf<Any?>()
+        val ignores = ignoreFields()
+
         entries.forEach { prop ->
-            if (valueHandler != null) {
-                params.add(valueHandler(prop.key, prop.value))
-            } else {
-                when (prop.value) {
-                    is Enum<*> -> params.add((prop.value as Enum<*>).name)
-                    else -> params.add(prop.value)
+            if (!(ignores.isNotEmpty() && ignores.indexOf(prop.key) > -1)) {
+                if (valueHandler != null) {
+                    params.add(valueHandler(prop.key, prop.value))
+                } else {
+                    when (prop.value) {
+                        is Enum<*> -> params.add((prop.value as Enum<*>).name)
+                        else -> params.add(prop.value)
+                    }
                 }
             }
         }

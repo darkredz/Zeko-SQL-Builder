@@ -36,8 +36,10 @@ open class Delete : DataManipulation {
             if (entity.dataMap().isNotEmpty()) {
                 sql += "WHERE "
                 val entries = entity.dataMap().entries
+                val ignores = entity.ignoreFields()
 
                 for ((propName, value) in entries) {
+                    if (ignores.isNotEmpty() && ignores.indexOf(propName) > -1) continue
                     if (shouldIgnoreType(value)) continue
                     val prop = propName.toSnakeCase()
 
