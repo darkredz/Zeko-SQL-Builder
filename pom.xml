@@ -79,7 +79,7 @@
     </pluginRepositories>
 
     <properties>
-        <kotlin.version>1.4.10</kotlin.version>
+        <kotlin.version>1.5.10</kotlin.version>
         <vertx.version>4.1.1</vertx.version>
         <spek.version>2.0.9</spek.version>
         <jupiter.version>5.2.0</jupiter.version>
@@ -164,7 +164,7 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.9.10.8</version>
+            <version>2.11.4</version>
         </dependency>
         <dependency>
             <groupId>com.zaxxer</groupId>
