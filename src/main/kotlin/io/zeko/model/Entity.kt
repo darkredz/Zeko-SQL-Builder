@@ -140,29 +140,31 @@ abstract class Entity {
         return converted
     }
 
+    fun repeatMs(dateStr: String) = "S".repeat(dateStr.split(".").last().takeWhile { !it.isLetter() }.length)
+
     fun convertZoneDateTime(value: Any, useSystem: Boolean = false): ZonedDateTime {
         if (value !is String) {
             val dateStr = value.toString()
-            var pattern: DateTimeFormatter
+            var patternStr = ""
             if (dateStr.indexOf("T") > 0) {
-                pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSXXX")
+                patternStr = if (dateStr.indexOf(".") > 0)
+                    "yyyy-MM-dd'T'HH:mm:ss.${repeatMs(dateStr)}XXX"
+                else
+                    "yyyy-MM-dd'T'HH:mm:ssXXX"
             } else {
                 // Apache ignite returns "2020-05-06 17:15:03.322Z" for timestamp columns
-                if (dateStr.length > 21 && dateStr[19] + "" == "." && dateStr[21] + "" != "Z") {
-                    pattern = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSXXX")
-                } else {
-                    pattern = if (dateStr.indexOf(".") > 0)
-                        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SXXX")
-                    else
-                        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ssXXX")
-                }
+                patternStr = if (dateStr.indexOf(".") > 0)
+                    "yyyy-MM-dd HH:mm:ss.${repeatMs(dateStr)}XXX"
+                else
+                    "yyyy-MM-dd HH:mm:ssXXX"
             }
+            val pattern = DateTimeFormatter.ofPattern(patternStr)
             return ZonedDateTime.parse(dateStr.removeSuffix("Z") + "Z", pattern)
         }
 
         //Vertx JDBC client returns date time field as String and already converted to UTC
-        val pattern = if (value.indexOf("Z") == value.length - 1 && value.indexOf(".") == value.length - 5) {
-            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSz")
+        val pattern = if (value.indexOf("Z") == value.length - 1 && value.indexOf(".") > 0) {
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.${repeatMs(value)}z")
         } else {
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")
         }
