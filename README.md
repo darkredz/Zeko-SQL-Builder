@@ -752,26 +752,26 @@ Add this to your maven pom.xml
     <dependency>
       <groupId>io.zeko</groupId>
       <artifactId>zeko-sql-builder</artifactId>
-      <version>1.2.7</version>
+      <version>1.3.1</version>
     </dependency>
     
     <!-- Jasync Mysql driver if needed -->
     <dependency>
        <groupId>com.github.jasync-sql</groupId>
        <artifactId>jasync-mysql</artifactId>
-       <version>1.1.5</version>
+       <version>1.2.3</version>
     </dependency>
     <!-- Hikari Mysql connection pool if needed -->
     <dependency>
         <groupId>com.zaxxer</groupId>
         <artifactId>HikariCP</artifactId>
-        <version>3.4.5</version>
+        <version>5.0.1</version>
     </dependency>
     <!-- Vertx jdbc client if needed -->
     <dependency>
         <groupId>io.vertx</groupId>
         <artifactId>vertx-jdbc-client</artifactId>
-        <version>${vertx.version}</version>
+        <version>4.1.1</version>
     </dependency>
     <dependency>
         <groupId>org.jetbrains.kotlinx</groupId>
