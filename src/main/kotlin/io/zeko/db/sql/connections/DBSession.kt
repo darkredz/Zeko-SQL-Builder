@@ -17,10 +17,10 @@ interface DBSession {
     suspend fun close()
     suspend fun insert(sql: String, params: List<Any?>, closeStatement: Boolean = true, closeConn: Boolean = false): List<*>
     suspend fun update(sql: String, params: List<Any?>, closeStatement: Boolean = true, closeConn: Boolean = false): Int
-    suspend fun queryPrepared(sql: String, params: List<Any?>, dataClassHandler: (dataMap: Map<String, Any?>) -> Any, closeStatement: Boolean = true, closeConn: Boolean = false): List<*>
+    suspend fun <T> queryPrepared(sql: String, params: List<Any?>, dataClassHandler: (dataMap: Map<String, Any?>) -> T, closeStatement: Boolean = true, closeConn: Boolean = false): List<T>
     suspend fun queryPrepared(sql: String, params: List<Any?>): Any
     suspend fun queryPrepared(sql: String, params: List<Any?>, columns: List<String>, closeConn: Boolean = false): List<LinkedHashMap<String, Any?>>
-    suspend fun query(sql: String, dataClassHandler: (dataMap: Map<String, Any?>) -> Any, closeStatement: Boolean = true, closeConn: Boolean = false): List<*>
+    suspend fun <T> query(sql: String, dataClassHandler: (dataMap: Map<String, Any?>) -> T, closeStatement: Boolean = true, closeConn: Boolean = false): List<T>
     suspend fun query(sql: String): Any
     suspend fun query(sql: String, columns: List<String>, closeConn: Boolean = false): List<LinkedHashMap<String, Any?>>
 }

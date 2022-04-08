@@ -269,7 +269,7 @@ open class HikariDBSession : DBSession {
         return listOf<Void>()
     }
 
-    override suspend fun queryPrepared(sql: String, params: List<Any?>, dataClassHandler: (dataMap: Map<String, Any?>) -> Any, closeStatement: Boolean, closeConn: Boolean): List<*> {
+    override suspend fun <T> queryPrepared(sql: String, params: List<Any?>, dataClassHandler: (dataMap: Map<String, Any?>) -> T, closeStatement: Boolean, closeConn: Boolean): List<T> {
         val stmt = prepareStatement(sql, params)
         val rs = stmt.executeQuery()
         val rows = resultSetToObjects(rs, dataClassHandler)
@@ -295,7 +295,7 @@ open class HikariDBSession : DBSession {
         return result
     }
 
-    override suspend fun query(sql: String, dataClassHandler: (dataMap: Map<String, Any?>) -> Any, closeStatement: Boolean, closeConn: Boolean): List<*> {
+    override suspend fun <T> query(sql: String, dataClassHandler: (dataMap: Map<String, Any?>) -> T, closeStatement: Boolean, closeConn: Boolean): List<T> {
         logger?.logQuery(sql)
         val stmt: Statement = rawConn.createStatement()
         val rs = stmt.executeQuery(sql)
@@ -324,10 +324,10 @@ open class HikariDBSession : DBSession {
         return result
     }
 
-    private fun resultSetToObjects(rs: ResultSet, dataClassHandler: (dataMap: Map<String, Any?>) -> Any): List<*> {
+    private fun <T> resultSetToObjects(rs: ResultSet, dataClassHandler: (dataMap: Map<String, Any?>) -> T): List<T> {
         val md = rs.metaData
         val columns = md.columnCount
-        val rows = arrayListOf<Any>()
+        val rows = arrayListOf<T>()
         while (rs.next()) {
             val dataMap = HashMap<String, Any?>(columns)
             for (i in 1..columns) {

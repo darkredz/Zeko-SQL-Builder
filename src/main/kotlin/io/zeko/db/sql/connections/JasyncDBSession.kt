@@ -129,7 +129,7 @@ open class JasyncDBSession : DBSession {
         return listOf<Void>()
     }
 
-    override suspend fun queryPrepared(sql: String, params: List<Any?>, dataClassHandler: (dataMap: Map<String, Any?>) -> Any, closeStatement: Boolean, closeConn: Boolean): List<*> {
+    override suspend fun <T> queryPrepared(sql: String, params: List<Any?>, dataClassHandler: (dataMap: Map<String, Any?>) -> T, closeStatement: Boolean, closeConn: Boolean): List<T> {
         logger?.logQuery(sql, params)
         val res = suspendingConn().sendPreparedStatement(sql, convertParams(params))
         val rows = resultSetToObjects(res.rows, dataClassHandler)
@@ -150,7 +150,7 @@ open class JasyncDBSession : DBSession {
         return rs
     }
 
-    override suspend fun query(sql: String, dataClassHandler: (dataMap: Map<String, Any?>) -> Any, closeStatement: Boolean, closeConn: Boolean): List<*> {
+    override suspend fun <T> query(sql: String, dataClassHandler: (dataMap: Map<String, Any?>) -> T, closeStatement: Boolean, closeConn: Boolean): List<T> {
         logger?.logQuery(sql)
         val res = suspendingConn().sendQuery(sql)
         val rows = resultSetToObjects(res.rows, dataClassHandler)
@@ -171,8 +171,8 @@ open class JasyncDBSession : DBSession {
         return rs
     }
 
-    private fun resultSetToObjects(rs: ResultSet, dataClassHandler: (dataMap: Map<String, Any?>) -> Any): List<*> {
-        val rows = arrayListOf<Any>()
+    private fun  <T> resultSetToObjects(rs: ResultSet, dataClassHandler: (dataMap: Map<String, Any?>) -> T): List<T> {
+        val rows = arrayListOf<T>()
         val columns = rs.columnNames()
         rs.forEach {
             val dataMap = mutableMapOf<String, Any?>()

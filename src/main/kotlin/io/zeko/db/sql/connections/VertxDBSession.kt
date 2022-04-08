@@ -234,7 +234,7 @@ open class VertxDBSession : DBSession {
         return listOf<Void>()
     }
 
-    override suspend fun queryPrepared(sql: String, params: List<Any?>, dataClassHandler: (dataMap: Map<String, Any?>) -> Any, closeStatement: Boolean, closeConn: Boolean): List<*> {
+    override suspend fun <T> queryPrepared(sql: String, params: List<Any?>, dataClassHandler: (dataMap: Map<String, Any?>) -> T, closeStatement: Boolean, closeConn: Boolean): List<T> {
         logger?.logQuery(sql, params)
         val res = rawConn.queryWithParamsAwait(sql, convertParams(params))
         val rows = res.rows.map { jObj ->
@@ -258,7 +258,7 @@ open class VertxDBSession : DBSession {
         return rs
     }
 
-    override suspend fun query(sql: String, dataClassHandler: (dataMap: Map<String, Any?>) -> Any, closeStatement: Boolean, closeConn: Boolean): List<*> {
+    override suspend fun <T> query(sql: String, dataClassHandler: (dataMap: Map<String, Any?>) -> T, closeStatement: Boolean, closeConn: Boolean): List<T> {
         logger?.logQuery(sql)
         val res = rawConn.queryAwait(sql)
         val rows = res.rows.map { jObj ->
