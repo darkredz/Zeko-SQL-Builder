@@ -133,6 +133,23 @@ class MySQLJoinQuerySpec : Spek({
                         "GROUP BY role.id, role.name " +
                         "HAVING SUM( role.id ) > 2 AND COUNT( role.id ) < 10 ORDER BY user.id ASC LIMIT 10 OFFSET 20", sql)
             }
+
+            it("should match sql with one table inner join a subquery") {
+                val sql = Query().fields("*")
+                    .from("user")
+                    .innerJoin(
+                        Query().fields("id", "user_id", "(total_savings - total_spendings) as balance").from("report"),
+                        "user_wallet"
+                    )
+                    .on("user_wallet.user_id = user.id")
+                    .toSql()
+                debug(sql)
+                assertEquals("""
+                    SELECT * FROM user INNER JOIN ( 
+                    SELECT id, user_id, (total_savings - total_spendings) as balance FROM report ) as user_wallet 
+                    ON ( user_wallet.user_id = user.id )
+                """.trimIndent().replace("\n", ""), sql)
+            }
         }
     }
 })

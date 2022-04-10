@@ -125,12 +125,23 @@ Query()
     .order("user.id")
     .limit(10, 20)
     .toSql()
+
+// Join with subquery
+Query().fields("*")
+    .from("user")
+    .innerJoin(
+        Query().fields("id", "user_id", "(total_savings - total_spendings) as balance").from("report"),
+        "user_wallet"
+    )
+    .on("user_wallet.user_id = user.id")
+    .toSql()
 ```
 
 Outputs
 ```sql
 SELECT * FROM user LEFT JOIN address ON (address.user_id = user.id )
 SELECT user.id as `user-id`, user.name as `user-name`, role.id as `role-id`, role.role_name as `role-role_name`, user.id as `role-user_id`, address.id as `address-id`, address.street1 as `address-street1`, address.street2 as `address-street2`, user.id as `address-user_id` FROM user LEFT JOIN address ON (address.user_id = user.id ) LEFT JOIN user_has_role ON (user_has_role.user_id = user.id ) LEFT JOIN role ON (role.id = user_has_role.role_id ) WHERE user.status > 0 OR user.id NOT IN (1,2,3) GROUP BY role.id, role.name HAVING SUM( role.id ) > 2 AND COUNT( role.id ) < 10 ORDER BY user.id ASC LIMIT 10 OFFSET 20
+SELECT * FROM user INNER JOIN ( SELECT id, user_id, (total_savings - total_spendings) as balance FROM report ) as user_wallet ON ( user_wallet.user_id = user.id )
 ```
 
 #### MySQL Fulltext search
@@ -752,7 +763,7 @@ Add this to your maven pom.xml
     <dependency>
       <groupId>io.zeko</groupId>
       <artifactId>zeko-sql-builder</artifactId>
-      <version>1.3.1</version>
+      <version>1.3.2</version>
     </dependency>
     
     <!-- Jasync Mysql driver if needed -->

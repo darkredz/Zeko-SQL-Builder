@@ -140,6 +140,23 @@ class ANSIJoinQuerySpec : Spek({
                     LIMIT 10 OFFSET 20
                 """.trimIndent().replace("\n", ""), sql)
             }
+
+            it("should match sql with one table inner join a subquery") {
+                val sql = ANSIQuery().fields("*")
+                    .from("user")
+                    .innerJoin(
+                        ANSIQuery().fields("id", "user_id", "(total_savings - total_spendings) as balance").from("report"),
+                        "user_wallet"
+                    )
+                    .on("user_wallet.user_id = user.id")
+                    .toSql()
+                debug(sql)
+                assertEquals("""
+                    SELECT * FROM "user" INNER JOIN ( 
+                    SELECT id, user_id, (total_savings - total_spendings) as balance FROM "report" ) as "user_wallet" 
+                    ON ( "user_wallet".user_id = "user".id )
+                """.trimIndent().replace("\n", ""), sql)
+            }
         }
     }
 })

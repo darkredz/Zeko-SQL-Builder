@@ -7,7 +7,6 @@ data class QueryInfo(val sql: String, val columns: List<String>, val sqlFields: 
 
 class QueryParts {
     private val rgxFindField = "([^\\\"\\ ][a-zA-Z0-9\\_]+[^\\\"\\ ])\\.([^\\\"\\s][a-zA-Z0-9\\_\\-\\=\\`\\~\\:\\.\\,\\|\\*\\^\\#\\@\\\$]+[\\^\"\\s])".toPattern()
-    private val rgxReplace = "\\\"\$1\\\".\$2"
     var linebreak: String = " "
         get() = field
         set(value) {
@@ -49,8 +48,9 @@ class QueryParts {
         this.custom = customExpression
     }
 
-    private fun escapeTableName(statement: String): String {
+    private fun escapeTableName(statement: String, esp: String): String {
         val matcher = rgxFindField.matcher(statement)
+        val rgxReplace = "\\" + esp + "\$1\\" + esp + ".\$2"
         return matcher.replaceAll(rgxReplace)
     }
 
@@ -82,7 +82,7 @@ class QueryParts {
                     val asTable = if (espTableName) "$esp$subTable$esp" else subTable
                     fromPart = "(${subParts.sql}) AS $asTable"
                     if (espTableName) {
-                        fromPart = escapeTableName(fromPart)
+                        fromPart = escapeTableName(fromPart, esp)
                     }
                 } else {
                     fromPart = "(${subParts.sql})"
@@ -99,8 +99,23 @@ class QueryParts {
     private fun buildJoinsPart(esp: String, espTableName: Boolean): String {
         var joinsPart = ""
         for ((join, conditions) in joins) {
-            val parts = join.split("-")
-            val tbl = if (espTableName) "$esp${parts.last()}$esp" else parts.last()
+            val parts = join.split("-@")
+            val lastPart = parts.last()
+            var asName = ""
+            val tbl = if (espTableName) {
+                if (lastPart.startsWith("**")) {
+                    asName = lastPart.substring(lastPart.indexOf("^^") + 2)
+                    "( ${lastPart.removePrefix("**").removeSuffix("^^$asName")} )"
+                } else
+                    "$esp$lastPart$esp"
+            } else {
+                if (lastPart.startsWith("**")) {
+                    asName = lastPart.substring(lastPart.indexOf("^^") + 2)
+                    "( ${lastPart.removePrefix("**").removeSuffix("^^$asName")} )"
+                } else
+                    lastPart
+            }
+
             val joinStmt = parts.subList(0, parts.size - 1).joinToString(" ").toUpperCase()
             var logicStmt = ""
 
@@ -110,12 +125,19 @@ class QueryParts {
                 if (parts.size > 0 && !parts[0].contains(".")) {
                     s = "${tbl}.${s.trimStart()}"
                 }
-                logicStmt += if (espTableName) escapeTableName(s) else s
+                logicStmt += if (espTableName) escapeTableName(s, esp) else s
             }
 
             if (logicStmt != "") {
                 logicStmt = logicStmt.substring(0, logicStmt.length - 4)
-                joinsPart += linebreak + "$joinStmt $tbl ON ($logicStmt)"
+                if (asName.isNotEmpty()) {
+                    if (espTableName) {
+                        asName = "$esp$asName$esp"
+                    }
+                    joinsPart += linebreak + "$joinStmt $tbl as $asName ON ($logicStmt)"
+                } else {
+                    joinsPart += linebreak + "$joinStmt $tbl ON ($logicStmt)"
+                }
             }
         }
         return joinsPart
@@ -125,7 +147,7 @@ class QueryParts {
         var wherePart = ""
         where.forEach {
             val s = "${it.getStatement()} ${it.getOperator()} "
-            wherePart += linebreak + (if (espTableName) escapeTableName(s) else s).trimEnd()
+            wherePart += linebreak + (if (espTableName) escapeTableName(s, esp) else s).trimEnd()
         }
 
         if (wherePart != "") {
@@ -139,7 +161,7 @@ class QueryParts {
         if (groupBys.size > 0) {
             groupBys.forEach {
                 if (espTableName) {
-                    groupByPart += escapeTableName("$it, ")
+                    groupByPart += escapeTableName("$it, ", esp)
                 } else {
                     groupByPart += "$it, "
                 }
@@ -155,7 +177,7 @@ class QueryParts {
         var havingPart = ""
         havings.forEach {
             val s = "${it.getStatement()} ${it.getOperator()} "
-            havingPart += linebreak + (if (espTableName) escapeTableName(s) else s).trimEnd()
+            havingPart += linebreak + (if (espTableName) escapeTableName(s, esp) else s).trimEnd()
         }
 
         if (havingPart != "") {
@@ -168,7 +190,7 @@ class QueryParts {
         var orderPart = ""
         order.forEach {
             val s = "${it.fieldName} ${it.getDirection()}, "
-            orderPart += if (espTableName) escapeTableName(s) else s
+            orderPart += if (espTableName) escapeTableName(s, esp) else s
         }
 
         if (orderPart != "") {
