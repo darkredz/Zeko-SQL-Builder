@@ -763,7 +763,7 @@ Add this to your maven pom.xml
     <dependency>
       <groupId>io.zeko</groupId>
       <artifactId>zeko-sql-builder</artifactId>
-      <version>1.3.2</version>
+      <version>1.4.0</version>
     </dependency>
     
     <!-- Jasync Mysql driver if needed -->

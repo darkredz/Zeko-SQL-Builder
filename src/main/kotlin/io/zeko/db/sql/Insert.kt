@@ -4,6 +4,8 @@ import io.zeko.db.sql.utilities.toSnakeCase
 import io.zeko.model.Entity
 
 open class Insert : DataManipulation {
+    protected var duplicateUpdateFields: Map<String, Any?>? = null
+    protected var ignore = false
     protected var select: Query? = null
     protected var insertFields: List<String>? = null
 
@@ -28,10 +30,50 @@ open class Insert : DataManipulation {
         return this
     }
 
+    fun ignore(): Insert {
+        this.ignore = true
+        return this
+    }
+
+    fun onDuplicateUpdate(fields: Map<String, Any?>?): Insert {
+        duplicateUpdateFields = fields
+        return this
+    }
+
     override fun toSql(): String {
-        var sql = "INSERT INTO " + getTableName()
+        var sql = if (ignore)
+            "INSERT IGNORE INTO " + getTableName()
+        else
+            "INSERT INTO " + getTableName()
+
         var columns = arrayListOf<String>()
         var values = arrayListOf<String>()
+        val onDuplicatePart = arrayListOf<String>()
+        var onDuplicateSql = ""
+
+        if (duplicateUpdateFields != null) {
+            // ON DUPLICATE KEY UPDATE
+            for ((propName, value) in duplicateUpdateFields!!) {
+                if (value != null) {
+                    if (parameterize) {
+                        if (value is QueryBlock){
+                            onDuplicatePart.add("$propName = $value")
+                        } else {
+                            onDuplicatePart.add("$propName = ?")
+                        }
+                    } else {
+                        if (value is String) {
+                            onDuplicatePart.add("$propName = '${value.replace("'", "''")}'")
+                        } else if (value is QueryBlock){
+                            onDuplicatePart.add("$propName = $value")
+                        } else {
+                            onDuplicatePart.add("$propName = $value")
+                        }
+                    }
+                }
+            }
+            onDuplicateSql = " ON DUPLICATE KEY UPDATE " + onDuplicatePart.joinToString(", ")
+        }
 
         if (entity.dataMap().isNotEmpty()) {
             val entries = entity.dataMap().entries
@@ -63,6 +105,7 @@ open class Insert : DataManipulation {
         if (this.select != null) {
             sql += this.select?.toSql()
         }
+        sql += onDuplicateSql
         return sql.trimEnd()
     }
 }

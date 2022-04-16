@@ -96,6 +96,59 @@ class InsertStatementSpec : Spek({
                 debug(sql)
                 assertEquals("INSERT INTO users ( age, id ) VALUES ( 60, 12 )", sql)
             }
+
+            it("should match insert...select and on duplicate key update sql when passing Query object") {
+                val sql = Insert(User(), "id", "name").select(
+                    Query().fields("user_id", "fullname")
+                        .from("customer")
+                        .where("status" eq 0)
+                ).onDuplicateUpdate(hashMapOf(
+                    "repeated" to QueryBlock("repeated", "+", "1"),
+                    "is_modified" to true
+                ))
+                    .toSql()
+                debug(sql)
+                assertEquals("INSERT INTO users ( id, name ) SELECT user_id, fullname FROM customer WHERE status = 0 ON DUPLICATE KEY UPDATE repeated = repeated + 1, is_modified = true", sql)
+            }
+
+            it("should match insert...on duplicate key update sql when passing Query object") {
+                val user = User().apply {
+                    id = 3
+                    name = "Joey Tan"
+                    age = 43
+                }
+                val sql = Insert(user).onDuplicateUpdate(hashMapOf(
+                    "repeated" to QueryBlock("repeated", "+", "1"),
+                    "is_modified" to true
+                )).toSql()
+                debug(sql)
+                assertEquals("INSERT INTO users ( id, name, age ) VALUES ( 3, 'Joey Tan', 43 )  ON DUPLICATE KEY UPDATE repeated = repeated + 1, is_modified = true", sql)
+            }
+
+            it("should match insert...on duplicate key update parameterized sql when passing Query object") {
+                val user = User().apply {
+                    id = 3
+                    name = "Joey Tan"
+                    age = 43
+                }
+                val sql = Insert(user, true).onDuplicateUpdate(hashMapOf(
+                    "repeated" to QueryBlock("repeated", "+", "?"),
+                    "is_modified" to true
+                )).toSql()
+                debug(sql)
+                assertEquals("INSERT INTO users ( id, name, age ) VALUES ( ?, ?, ? )  ON DUPLICATE KEY UPDATE repeated = repeated + ?, is_modified = ?", sql)
+            }
+
+            it("should match insert ignore sql when ignore() is used") {
+                val sql = Insert(User(
+                    "id" to 1,
+                    "name" to "Leng"
+                ))
+                    .ignore()
+                    .toSql()
+                debug(sql)
+                assertEquals("INSERT IGNORE INTO users ( id, name ) VALUES ( 1, 'Leng' )", sql)
+            }
         }
     }
 })
