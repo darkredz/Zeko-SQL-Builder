@@ -11,7 +11,7 @@ import kotlin.test.assertEquals
 class InsertStatementSpec : Spek({
 
     fun debug(msg: Any) {
-        if (true) println(msg.toString())
+        if (false) println(msg.toString())
     }
 
     describe("Query Builder Insert Statement test") {
