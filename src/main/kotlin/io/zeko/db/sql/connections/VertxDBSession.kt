@@ -223,7 +223,7 @@ open class VertxDBSession : DBSession {
             // Apache ignite insert will return this due to Auto generated keys are not supported.
             logger?.logUnsupportedSql(err)
             if (updateRes != null ) {
-                return updateRes?.keys.toList()
+                return updateRes.keys.toList()
             }
         } catch (err: Exception) {
             throwDuplicateException(err)
