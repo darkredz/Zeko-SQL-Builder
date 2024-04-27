@@ -2,7 +2,6 @@ package io.zeko.db.sql.connections
 
 import io.vertx.core.Vertx
 import io.vertx.core.json.JsonObject
-import io.vertx.mysqlclient.MySQLBuilder
 import io.vertx.mysqlclient.MySQLConnectOptions
 import io.vertx.sqlclient.Pool
 import io.vertx.sqlclient.PoolOptions
@@ -31,10 +30,7 @@ class VertxAsyncMysqlPool : DBPool {
            .setReconnectInterval(config.getLong("reconnectInterval", 1000))
 
         val poolOptions = PoolOptions().setMaxSize(config.getInteger("poolSize"))
-        client = MySQLBuilder.pool()
-            .with(poolOptions)
-            .connectingTo(conf)
-            .build()
+        client = Pool.pool(vertx, conf, poolOptions)
     }
 
     override suspend fun createConnection(): DBConn {

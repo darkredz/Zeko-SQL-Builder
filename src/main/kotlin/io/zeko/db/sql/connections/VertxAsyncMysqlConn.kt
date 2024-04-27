@@ -14,7 +14,6 @@ class VertxAsyncMysqlConn(val pool: Pool) : DBConn {
     }
 
     override suspend fun close() {
-        pool.close()
     }
 
     override suspend fun rollback() {
