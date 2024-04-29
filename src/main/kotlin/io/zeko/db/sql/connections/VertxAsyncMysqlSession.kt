@@ -98,7 +98,24 @@ open class VertxAsyncMysqlSession : DBSession {
     }
 
     override suspend fun <A> transaction(operation: suspend (DBSession) -> A): A {
-        return coroutineScope {
+        return (rawConnection() as Pool).withTransaction { client ->
+            Future.future {
+                GlobalScope.launch((dbPool as VertxAsyncMysqlPool).getVertx().dispatcher()) {
+                    try {
+                        val sess = VertxAsyncMysqlSession(dbPool, VertxAsyncMysqlConn((dbPool as VertxAsyncMysqlPool).getClient()), client as SqlClient, throwOnDuplicate)
+                        if (logger != null) sess.setQueryLogger(logger!!)
+                        val rs = operation.invoke(sess)
+                        it.complete(rs)
+                    } catch (err: Exception) {
+                        it.fail(err)
+                    }
+                }
+            }
+        }.coAwait()
+    }
+
+    override suspend fun <A> transaction(numRetries: Int, delayTry: Long, operation: suspend (DBSession) -> A) {
+        try {
             (rawConnection() as Pool).withTransaction { client ->
                 Future.future {
                     GlobalScope.launch((dbPool as VertxAsyncMysqlPool).getVertx().dispatcher()) {
@@ -113,27 +130,6 @@ open class VertxAsyncMysqlSession : DBSession {
                     }
                 }
             }.coAwait()
-        }
-    }
-
-    override suspend fun <A> transaction(numRetries: Int, delayTry: Long, operation: suspend (DBSession) -> A) {
-        try {
-            return coroutineScope {
-                (rawConnection() as Pool).withTransaction { client ->
-                    Future.future {
-                        GlobalScope.launch((dbPool as VertxAsyncMysqlPool).getVertx().dispatcher()) {
-                            try {
-                                val sess = VertxAsyncMysqlSession(dbPool, VertxAsyncMysqlConn((dbPool as VertxAsyncMysqlPool).getClient()), client as SqlClient, throwOnDuplicate)
-                                if (logger != null) sess.setQueryLogger(logger!!)
-                                val rs = operation.invoke(sess)
-                                it.complete(rs)
-                            } catch (err: Exception) {
-                                it.fail(err)
-                            }
-                        }
-                    }
-                }.coAwait()
-            }
         } catch (e: java.lang.Exception) {
             if (e !is DuplicateKeyException) {
                 if (numRetries > 0) {
@@ -157,22 +153,20 @@ open class VertxAsyncMysqlSession : DBSession {
     }
 
     override suspend fun <A> transactionOpen(operation: suspend (DBSession) -> A): A {
-        return coroutineScope {
-            (rawConnection() as Pool).withTransaction { client ->
-                Future.future {
-                    GlobalScope.launch((dbPool as VertxAsyncMysqlPool).getVertx().dispatcher()) {
-                        try {
-                            val sess = VertxAsyncMysqlSession(dbPool, VertxAsyncMysqlConn((dbPool as VertxAsyncMysqlPool).getClient()), client as SqlClient, throwOnDuplicate)
-                            if (logger != null) sess.setQueryLogger(logger!!)
-                            val rs = operation.invoke(sess)
-                            it.complete(rs)
-                        } catch (err: Exception) {
-                            it.fail(err)
-                        }
+        return (rawConnection() as Pool).withTransaction { client ->
+            Future.future {
+                GlobalScope.launch((dbPool as VertxAsyncMysqlPool).getVertx().dispatcher()) {
+                    try {
+                        val sess = VertxAsyncMysqlSession(dbPool, VertxAsyncMysqlConn((dbPool as VertxAsyncMysqlPool).getClient()), client as SqlClient, throwOnDuplicate)
+                        if (logger != null) sess.setQueryLogger(logger!!)
+                        val rs = operation.invoke(sess)
+                        it.complete(rs)
+                    } catch (err: Exception) {
+                        it.fail(err)
                     }
                 }
-            }.coAwait()
-        }
+            }
+        }.coAwait()
     }
 
     override suspend fun close() {
