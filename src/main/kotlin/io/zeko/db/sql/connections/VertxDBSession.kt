@@ -17,6 +17,7 @@ import java.sql.Date
 import java.sql.Time
 import java.sql.Timestamp
 import java.time.*
+import java.net.ConnectException
 
 open class VertxDBSession : DBSession {
     protected var conn: DBConn
@@ -24,6 +25,7 @@ open class VertxDBSession : DBSession {
     protected var rawConn: SQLConnection
     protected var logger: DBLogger? = null
     protected var throwOnDuplicate = true
+    protected var connErrorHandler: ((Throwable) -> Unit)? = null
 
     constructor(dbPool: DBPool, conn: DBConn) {
         this.dbPool = dbPool
@@ -47,6 +49,22 @@ open class VertxDBSession : DBSession {
     protected fun throwDuplicateException(err: Exception) {
         if (this.throwOnDuplicate) {
             throwDuplicate(err)
+        }
+    }
+
+    private suspend fun <T> executeQuery(
+        sql: String,
+        params: List<Any?>,
+        operation: suspend () -> T
+    ): T {
+        try {
+            logger?.logQuery(sql, params)
+            return operation()
+        } catch (err: Exception) {
+            if (err is ConnectException && connErrorHandler != null) {
+                connErrorHandler?.invoke(err)
+            }
+            throw err
         }
     }
 
@@ -156,6 +174,12 @@ open class VertxDBSession : DBSession {
         conn.close()
     }
 
+    // TODO: Add set conn error handler to interface class
+    fun setConnErrorHandler(handler: (Throwable) -> Unit): DBSession {
+        this.connErrorHandler = handler
+        return this
+    }
+
     override fun setQueryLogger(logger: DBLogger): DBSession {
         this.logger = logger
         return this
@@ -223,7 +247,7 @@ open class VertxDBSession : DBSession {
             // Apache ignite insert will return this due to Auto generated keys are not supported.
             logger?.logUnsupportedSql(err)
             if (updateRes != null ) {
-                return updateRes?.keys.toList()
+                return updateRes.keys.toList()
             }
         } catch (err: Exception) {
             throwDuplicateException(err)
@@ -234,51 +258,59 @@ open class VertxDBSession : DBSession {
         return listOf<Void>()
     }
 
+
+
     override suspend fun <T> queryPrepared(sql: String, params: List<Any?>, dataClassHandler: (dataMap: Map<String, Any?>) -> T, closeStatement: Boolean, closeConn: Boolean): List<T> {
-        logger?.logQuery(sql, params)
-        val res = rawConn.queryWithParamsAwait(sql, convertParams(params))
-        val rows = res.rows.map { jObj ->
-            val rowMap = jObj.map.mapKeys { it.key.toLowerCase() }
-            dataClassHandler(rowMap)
+        return executeQuery(sql, params) {
+            val res = rawConn.queryWithParamsAwait(sql, convertParams(params))
+            val rows = res.rows.map { jObj ->
+                val rowMap = jObj.map.mapKeys { it.key.toLowerCase() }
+                dataClassHandler(rowMap)
+            }
+            if (closeConn) conn.close()
+            rows
         }
-        if (closeConn) conn.close()
-        return rows
     }
 
     override suspend fun queryPrepared(sql: String, params: List<Any?>): ResultSet {
-        logger?.logQuery(sql, params)
-        return rawConn.queryWithParamsAwait(sql, convertParams(params))
+        return executeQuery(sql, params) {
+            rawConn.queryWithParamsAwait(sql, convertParams(params))
+        }
     }
 
     override suspend fun queryPrepared(sql: String, params: List<Any?>, columns: List<String>, closeConn: Boolean): List<LinkedHashMap<String, Any?>> {
-        logger?.logQuery(sql, params)
-        val res = rawConn.queryWithParamsAwait(sql, convertParams(params))
-        val rs = res.toMaps(columns)
-        if (closeConn) conn.close()
-        return rs
+        return executeQuery(sql, params) {
+            val res = rawConn.queryWithParamsAwait(sql, convertParams(params))
+            val rs = res.toMaps(columns)
+            if (closeConn) conn.close()
+            rs
+        }
     }
 
     override suspend fun <T> query(sql: String, dataClassHandler: (dataMap: Map<String, Any?>) -> T, closeStatement: Boolean, closeConn: Boolean): List<T> {
-        logger?.logQuery(sql)
-        val res = rawConn.queryAwait(sql)
-        val rows = res.rows.map { jObj ->
-            val rowMap = jObj.map.mapKeys { it.key.toLowerCase() }
-            dataClassHandler(rowMap)
+        return executeQuery(sql, listOf()) {
+            val res = rawConn.queryAwait(sql)
+            val rows = res.rows.map { jObj ->
+                val rowMap = jObj.map.mapKeys { it.key.toLowerCase() }
+                dataClassHandler(rowMap)
+            }
+            if (closeConn) conn.close()
+            rows
         }
-        if (closeConn) conn.close()
-        return rows
     }
 
     override suspend fun query(sql: String): ResultSet {
-        logger?.logQuery(sql)
-        return rawConn.queryAwait(sql)
+        return executeQuery(sql, listOf()) {
+            rawConn.queryAwait(sql)
+        }
     }
 
     override suspend fun query(sql: String, columns: List<String>, closeConn: Boolean): List<LinkedHashMap<String, Any?>> {
-        logger?.logQuery(sql)
-        val res = rawConn.queryAwait(sql)
-        val rs = res.toMaps(columns)
-        if (closeConn) conn.close()
-        return rs
+        return executeQuery(sql, listOf()) {
+            val res = rawConn.queryAwait(sql)
+            val rs = res.toMaps(columns)
+            if (closeConn) conn.close()
+            rs
+        }
     }
 }

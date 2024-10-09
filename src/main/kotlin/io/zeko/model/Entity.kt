@@ -147,10 +147,16 @@ abstract class Entity {
             val dateStr = value.toString()
             var patternStr = ""
             if (dateStr.indexOf("T") > 0) {
-                patternStr = if (dateStr.indexOf(".") > 0)
+                patternStr = if (dateStr.indexOf(".") > 0) {
                     "yyyy-MM-dd'T'HH:mm:ss.${repeatMs(dateStr)}XXX"
-                else
-                    "yyyy-MM-dd'T'HH:mm:ssXXX"
+                } else {
+                    // vertx sql client returns without second if second is 00, eg. 2024-04-30T12:47Z instead of 2024-04-30T12:47:00Z
+                    if (dateStr.count { it == ':' } < 2) {
+                        "yyyy-MM-dd'T'HH:mmXXX"
+                    } else {
+                        "yyyy-MM-dd'T'HH:mm:ssXXX"
+                    }
+                }
             } else {
                 // Apache ignite returns "2020-05-06 17:15:03.322Z" for timestamp columns
                 patternStr = if (dateStr.indexOf(".") > 0)
