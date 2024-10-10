@@ -1,7 +1,6 @@
 package io.zeko.db.sql.connections
 
 import io.vertx.core.Future
-import io.vertx.core.json.JsonArray
 import io.vertx.kotlin.coroutines.coAwait
 import io.vertx.kotlin.coroutines.dispatcher
 import io.vertx.mysqlclient.MySQLClient
@@ -16,10 +15,10 @@ import io.zeko.db.sql.utilities.convertParams
 import io.zeko.model.declarations.toDataObject
 import io.zeko.model.declarations.toMaps
 import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.net.ConnectException
+import java.net.UnknownHostException
 
 open class VertxAsyncMysqlSession : DBSession {
     protected var conn: DBConn
@@ -27,7 +26,7 @@ open class VertxAsyncMysqlSession : DBSession {
     protected var rawConn: SqlClient
     protected var logger: DBLogger? = null
     protected var throwOnDuplicate = true
-    protected var connErrorHandler: (suspend (Throwable, DBSession) -> Boolean)? = null
+    protected var connErrorHandler: (suspend (Throwable, DBErrorCode, DBSession) -> Boolean)? = null
 
     constructor(dbPool: DBPool, conn: DBConn) {
         this.dbPool = dbPool
@@ -62,7 +61,7 @@ open class VertxAsyncMysqlSession : DBSession {
     }
 
     // TODO: Add set conn error handler to interface class
-    fun setConnErrorHandler(handler: suspend (Throwable, DBSession) -> Boolean): DBSession {
+    fun setConnErrorHandler(handler: suspend (Throwable, DBErrorCode, DBSession) -> Boolean): DBSession {
         this.connErrorHandler = handler
         return this
     }
@@ -78,8 +77,33 @@ open class VertxAsyncMysqlSession : DBSession {
         rawConn = (dbPool as VertxAsyncMysqlPool).getClient()
     }
 
-    private fun checkIsConnError (err: Throwable): Boolean {
-        return err is ConnectException || err.message!!.contains("CLOSED")
+    private fun checkIsConnError (err: Throwable): DBErrorCode? {
+        // 1) UnknownHostException Failed to resolve [dbHost]
+        val dbHost = (dbPool as VertxAsyncMysqlPool).getConfig().getString("host")
+        val isUnknownHostErr = err is UnknownHostException && err.message!!.contains(dbHost)
+        if (isUnknownHostErr) {
+            return DBErrorCode.UNKNOWN_HOST
+        }
+
+        // 2) Exception in thread "vert.x-eventloop-thread-2" io.vertx.core.impl.NoStackTraceThrowable: Timeout
+        val isTimeout = err.message!!.contains("Timeout")
+        if (isTimeout) {
+            return DBErrorCode.CONN_TIMEOUT
+        }
+
+        // 3) Connection Closed Exception
+        val isConnClosed = err.message!!.contains("CLOSED")
+        if (isConnClosed) {
+            return DBErrorCode.CONN_CLOSED
+        }
+
+        // 4) ConnectException
+        val isConnException = err is ConnectException
+        if (isConnException) {
+            return DBErrorCode.CONN_EXCEPTION
+        }
+
+        return null
     }
 
     private suspend fun <T : Any> executeQuery(
@@ -88,8 +112,9 @@ open class VertxAsyncMysqlSession : DBSession {
         try {
             return operation()
         } catch (err: Throwable) {
-            if (checkIsConnError(err) && connErrorHandler != null) {
-                val toRetry = connErrorHandler?.invoke(err, this)
+            val errorCode = checkIsConnError(err)
+            if (errorCode != null && connErrorHandler != null) {
+                val toRetry = connErrorHandler?.invoke(err, errorCode, this)
                 if (toRetry == true) {
                     return operation()
                 } else {
@@ -160,8 +185,9 @@ open class VertxAsyncMysqlSession : DBSession {
                 }
             }.coAwait()
         } catch (err: Throwable) {
-            if (checkIsConnError(err) && connErrorHandler != null) {
-                val toRetry = connErrorHandler?.invoke(err, this)
+            val errorCode = checkIsConnError(err)
+            if (errorCode != null && connErrorHandler != null) {
+                val toRetry = connErrorHandler?.invoke(err, errorCode, this)
                 if (toRetry == true) {
                     return transaction(operation)
                 } else {
@@ -227,8 +253,9 @@ open class VertxAsyncMysqlSession : DBSession {
                 }
             }.coAwait()
         } catch (err: Throwable) {
-            if (checkIsConnError(err) && connErrorHandler != null) {
-                val toRetry = connErrorHandler?.invoke(err, this)
+            val errorCode = checkIsConnError(err)
+            if (errorCode != null && connErrorHandler != null) {
+                val toRetry = connErrorHandler?.invoke(err, errorCode, this)
                 if (toRetry == true) {
                     return transaction(operation)
                 } else {
@@ -266,8 +293,9 @@ open class VertxAsyncMysqlSession : DBSession {
             return updateRes.rowCount()
         } catch (err: Exception) {
             throwDuplicateException(err)
-            if (checkIsConnError(err) && connErrorHandler != null) {
-                val toRetry = connErrorHandler?.invoke(err, this)
+            val errorCode = checkIsConnError(err)
+            if (errorCode != null && connErrorHandler != null) {
+                val toRetry = connErrorHandler?.invoke(err, errorCode, this)
                 if (toRetry == true) {
                     return update(sql, params, closeStatement, closeConn)
                 } else {
@@ -291,8 +319,9 @@ open class VertxAsyncMysqlSession : DBSession {
             return listOf(lastInsertId)
         } catch (err: Exception) {
             throwDuplicateException(err)
-            if (checkIsConnError(err) && connErrorHandler != null) {
-                val toRetry = connErrorHandler?.invoke(err, this)
+            val errorCode = checkIsConnError(err)
+            if (errorCode != null && connErrorHandler != null) {
+                val toRetry = connErrorHandler?.invoke(err, errorCode, this)
                 if (toRetry == true) {
                     return insert(sql, params, closeStatement, closeConn)
                 } else {
