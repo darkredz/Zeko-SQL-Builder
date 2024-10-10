@@ -1,6 +1,7 @@
 package io.zeko.db.sql.connections
 
 import io.vertx.core.Future
+import io.vertx.core.impl.NoStackTraceThrowable
 import io.vertx.kotlin.coroutines.coAwait
 import io.vertx.kotlin.coroutines.dispatcher
 import io.vertx.mysqlclient.MySQLClient
@@ -78,6 +79,7 @@ open class VertxAsyncMysqlSession : DBSession {
     }
 
     private fun checkIsConnError (err: Throwable): DBErrorCode? {
+        println("checkIsConnError: $err")
         // 1) UnknownHostException Failed to resolve [dbHost]
         val dbHost = (dbPool as VertxAsyncMysqlPool).getConfig().getString("host")
         if (err.message?.contains(dbHost) == true && err is UnknownHostException) {
@@ -85,12 +87,12 @@ open class VertxAsyncMysqlSession : DBSession {
         }
 
         // 2) Exception in thread "vert.x-eventloop-thread-2" io.vertx.core.impl.NoStackTraceThrowable: Timeout
-        if (err.message?.contains("Timeout") == true) {
+        if (err.message?.contains("Timeout") == true && err is NoStackTraceThrowable) {
             return DBErrorCode.CONN_TIMEOUT
         }
 
-        // 3) Connection Closed Exception
-        if (err.message?.contains("CLOSED") == true) {
+        // 3) io.vertx.core.impl.NoStackTraceThrowable: Connection is not active now, current status: CLOSED
+        if (err.message?.contains("CLOSED") == true && err is NoStackTraceThrowable) {
             return DBErrorCode.CONN_CLOSED
         }
 
