@@ -80,20 +80,17 @@ open class VertxAsyncMysqlSession : DBSession {
     private fun checkIsConnError (err: Throwable): DBErrorCode? {
         // 1) UnknownHostException Failed to resolve [dbHost]
         val dbHost = (dbPool as VertxAsyncMysqlPool).getConfig().getString("host")
-        val isUnknownHostErr = err is UnknownHostException && err.message!!.contains(dbHost)
-        if (isUnknownHostErr) {
+        if (err.message?.contains(dbHost) == true && err is UnknownHostException) {
             return DBErrorCode.UNKNOWN_HOST
         }
 
         // 2) Exception in thread "vert.x-eventloop-thread-2" io.vertx.core.impl.NoStackTraceThrowable: Timeout
-        val isTimeout = err.message!!.contains("Timeout")
-        if (isTimeout) {
+        if (err.message?.contains("Timeout") == true) {
             return DBErrorCode.CONN_TIMEOUT
         }
 
         // 3) Connection Closed Exception
-        val isConnClosed = err.message!!.contains("CLOSED")
-        if (isConnClosed) {
+        if (err.message?.contains("CLOSED") == true) {
             return DBErrorCode.CONN_CLOSED
         }
 
