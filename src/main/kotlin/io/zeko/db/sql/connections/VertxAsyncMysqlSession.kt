@@ -79,7 +79,6 @@ open class VertxAsyncMysqlSession : DBSession {
     }
 
     private fun checkIsConnError (err: Throwable): DBErrorCode? {
-        println("checkIsConnError: $err")
         // 1) UnknownHostException Failed to resolve [dbHost]
         val dbHost = (dbPool as VertxAsyncMysqlPool).getConfig().getString("host")
         if (err.message?.contains(dbHost) == true && err is UnknownHostException) {
