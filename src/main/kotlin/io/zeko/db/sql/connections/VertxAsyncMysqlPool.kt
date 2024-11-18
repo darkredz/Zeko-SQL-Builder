@@ -2,6 +2,7 @@ package io.zeko.db.sql.connections
 
 import io.vertx.core.Vertx
 import io.vertx.core.json.JsonObject
+import io.vertx.core.tracing.TracingPolicy
 import io.vertx.mysqlclient.MySQLConnectOptions
 import io.vertx.sqlclient.Pool
 import io.vertx.sqlclient.PoolOptions
@@ -22,7 +23,13 @@ class VertxAsyncMysqlPool : DBPool {
     fun getClient(): Pool = client
 
     private fun init(config: JsonObject) {
-       val conf = MySQLConnectOptions()
+        val tracingPolicy = when (config.getString("tracingPolicy")) {
+            "ALWAYS" -> TracingPolicy.ALWAYS
+            "PROPAGATE" -> TracingPolicy.PROPAGATE
+            "IGNORE" -> TracingPolicy.IGNORE
+            else -> TracingPolicy.PROPAGATE
+        }
+        val conf = MySQLConnectOptions()
             .setHost(config.getString("host"))
             .setPort(config.getInteger("port"))
             .setDatabase(config.getString("database"))
@@ -30,6 +37,7 @@ class VertxAsyncMysqlPool : DBPool {
             .setPassword(config.getString("password"))
            .setReconnectAttempts(config.getInteger("reconnectAttempts", 1))
            .setReconnectInterval(config.getLong("reconnectInterval", 1000))
+           .setTracingPolicy(tracingPolicy)
 
         val poolOptions = PoolOptions().setMaxSize(config.getInteger("poolSize"))
         client = Pool.pool(vertx, conf, poolOptions)
