@@ -1,9 +1,9 @@
 package io.zeko.db.sql
 
 open class QueryBlock {
-    private var left: String = ""
-    private var right: String = ""
-    private var center: String = ""
+    var left: String = ""
+    var right: String = ""
+    var center: String = ""
 
     constructor(left: String, center: String, right: String) {
         this.center = center
