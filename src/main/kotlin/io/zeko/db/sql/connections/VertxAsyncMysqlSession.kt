@@ -20,6 +20,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.net.ConnectException
+import java.net.NoRouteToHostException
 import java.net.UnknownHostException
 
 open class VertxAsyncMysqlSession : DBSession {
@@ -80,6 +81,9 @@ open class VertxAsyncMysqlSession : DBSession {
     }
 
     private fun checkIsConnError (err: Throwable): DBErrorCode? {
+        logger?.logError(err as Exception)
+        logger?.logQuery("isClosedConnectionException: ${err is ClosedConnectionException}", listOf())
+
         // 1) UnknownHostException Failed to resolve [dbHost]
         val dbHost = (dbPool as VertxAsyncMysqlPool).getConfig().getString("host")
         if (err.message?.contains(dbHost) == true && err is UnknownHostException) {
@@ -123,6 +127,11 @@ open class VertxAsyncMysqlSession : DBSession {
         // 8) io.vertx.sqlclient.ClosedConnectionException: Failed to read any response from the server, the underlying connection may have been lost unexpectedly
         if (err is ClosedConnectionException) {
             return DBErrorCode.CONN_CLOSED
+        }
+
+        // io.netty.channel.AbstractChannel$AnnotatedNoRouteToHostException: No route to host: /127.0.0.1:4000
+        if (err.message?.contains(dbHost) == true && err is NoRouteToHostException) {
+            return DBErrorCode.UNKNOWN_HOST
         }
 
         return null
