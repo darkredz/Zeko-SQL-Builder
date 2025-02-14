@@ -5,6 +5,7 @@ import io.vertx.core.impl.NoStackTraceThrowable
 import io.vertx.kotlin.coroutines.coAwait
 import io.vertx.kotlin.coroutines.dispatcher
 import io.vertx.mysqlclient.MySQLClient
+import io.vertx.sqlclient.ClosedConnectionException
 import io.vertx.sqlclient.Pool
 import io.vertx.sqlclient.Row
 import io.vertx.sqlclient.RowSet
@@ -99,6 +100,29 @@ open class VertxAsyncMysqlSession : DBSession {
         val isConnException = err is ConnectException
         if (isConnException) {
             return DBErrorCode.CONN_EXCEPTION
+        }
+
+        // 5) io.vertx.mysqlclient.MySQLException: {errorMessage=PD server timeout: , errorCode=9001, sqlState=HY000}
+        val isPdServerTimeout = err.message?.contains("PD server timeout") == true && err is io.vertx.mysqlclient.MySQLException
+        if (isPdServerTimeout) {
+            return DBErrorCode.CONN_TIMEOUT
+        }
+
+        // 6) io.vertx.mysqlclient.MySQLException: {errorMessage=TiKV server timeout: , errorCode=9001, sqlState=HY000}
+        val isTiKVServerTimeout = err.message?.contains("TiKV server timeout") == true && err is io.vertx.mysqlclient.MySQLException
+        if (isTiKVServerTimeout) {
+            return DBErrorCode.CONN_TIMEOUT
+        }
+
+        // 7) io.vertx.mysqlclient.MySQLException: {errorMessage=please make sure TiDB can connect to TiKV: , errorCode=9001, sqlState=HY000}
+        val isTiDBCantConnectToTiKV = err.message?.contains("please make sure TiDB can connect to TiKV") == true && err is io.vertx.mysqlclient.MySQLException
+        if (isTiDBCantConnectToTiKV) {
+            return DBErrorCode.CONN_EXCEPTION
+        }
+
+        // 8) io.vertx.sqlclient.ClosedConnectionException: Failed to read any response from the server, the underlying connection may have been lost unexpectedly
+        if (err is ClosedConnectionException) {
+            return DBErrorCode.CONN_CLOSED
         }
 
         return null
