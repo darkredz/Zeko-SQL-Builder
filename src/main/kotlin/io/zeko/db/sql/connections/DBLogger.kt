@@ -8,6 +8,8 @@ interface DBLogger {
     fun setLogLevels(sqlLevel: DBLogLevel, paramsLevel: DBLogLevel): DBLogger
     fun logQuery(sql: String, params: List<Any?>? = null)
     fun logError(err: Exception)
+    fun logError(err: Throwable)
     fun logUnsupportedSql(err: Exception)
     fun logRetry(numRetriesLeft: Int, err: Exception)
+    fun log(message: String)
 }

@@ -81,8 +81,8 @@ open class VertxAsyncMysqlSession : DBSession {
     }
 
     private fun checkIsConnError (err: Throwable): DBErrorCode? {
-        logger?.logError(err as Exception)
-        logger?.logQuery("isClosedConnectionException: ${err is ClosedConnectionException}", listOf())
+        logger?.logError(err)
+        logger?.log("isClosedConnectionException: ${err is ClosedConnectionException}")
 
         // 1) UnknownHostException Failed to resolve [dbHost]
         val dbHost = (dbPool as VertxAsyncMysqlPool).getConfig().getString("host")

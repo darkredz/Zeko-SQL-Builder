@@ -6,6 +6,7 @@ import io.vertx.core.tracing.TracingPolicy
 import io.vertx.mysqlclient.MySQLConnectOptions
 import io.vertx.sqlclient.Pool
 import io.vertx.sqlclient.PoolOptions
+import java.util.concurrent.TimeUnit
 
 class VertxAsyncMysqlPool : DBPool {
     private lateinit var client: Pool
@@ -39,7 +40,12 @@ class VertxAsyncMysqlPool : DBPool {
            .setReconnectInterval(config.getLong("reconnectInterval", 1000))
            .setTracingPolicy(tracingPolicy)
 
-        val poolOptions = PoolOptions().setMaxSize(config.getInteger("poolSize"))
+        val timeoutUnit = TimeUnit.valueOf(config.getString("poolConnectionTimeoutUnit", PoolOptions.DEFAULT_CONNECTION_TIMEOUT_TIME_UNIT.name))
+
+        val poolOptions = PoolOptions()
+            .setMaxSize(config.getInteger("poolSize", PoolOptions.DEFAULT_MAX_SIZE))
+            .setConnectionTimeout(config.getInteger("poolConnectionTimeout", PoolOptions.DEFAULT_CONNECTION_TIMEOUT))
+            .setConnectionTimeoutUnit(timeoutUnit)
         client = Pool.pool(vertx, conf, poolOptions)
     }
 
