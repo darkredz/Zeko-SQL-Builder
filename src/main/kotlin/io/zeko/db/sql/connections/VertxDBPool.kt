@@ -2,11 +2,13 @@ package io.zeko.db.sql.connections
 
 import io.vertx.core.Vertx
 import io.vertx.core.json.JsonObject
+import io.vertx.core.tracing.TracingPolicy
 import io.vertx.jdbcclient.JDBCConnectOptions
 import io.vertx.jdbcclient.JDBCPool
 import io.vertx.kotlin.coroutines.coAwait
 import io.vertx.sqlclient.Pool
 import io.vertx.sqlclient.PoolOptions
+import java.util.concurrent.TimeUnit
 
 class VertxDBPool : DBPool {
     private lateinit var pool: Pool
@@ -21,7 +23,7 @@ class VertxDBPool : DBPool {
     private fun init(config: JsonObject) {
         val connectOptions = JDBCConnectOptions()
         if (config.containsKey("jdbcUrl")) {
-            connectOptions.setJdbcUrl(config.getString("driverClassName"))
+            connectOptions.setJdbcUrl(config.getString("jdbcUrl"))
         }
         if (config.containsKey("database")) {
             connectOptions.setDatabase(config.getString("database"))
@@ -33,8 +35,21 @@ class VertxDBPool : DBPool {
             connectOptions.setPassword(config.getString("password"))
         }
 
+        val tracingPolicy = when (config.getString("tracingPolicy")) {
+            "ALWAYS" -> TracingPolicy.ALWAYS
+            "PROPAGATE" -> TracingPolicy.PROPAGATE
+            "IGNORE" -> TracingPolicy.IGNORE
+            else -> TracingPolicy.PROPAGATE
+        }
+
+        connectOptions.setTracingPolicy(tracingPolicy)
+
+        val timeoutUnit = TimeUnit.valueOf(config.getString("poolConnectionTimeoutUnit", PoolOptions.DEFAULT_CONNECTION_TIMEOUT_TIME_UNIT.name))
         val poolOptions = PoolOptions()
-            .setMaxSize(16)
+            .setMaxSize(config.getInteger("poolSize", PoolOptions.DEFAULT_MAX_SIZE))
+            .setConnectionTimeout(config.getInteger("poolConnectionTimeout", PoolOptions.DEFAULT_CONNECTION_TIMEOUT))
+            .setConnectionTimeoutUnit(timeoutUnit)
+
         pool = JDBCPool.pool(vertx, connectOptions, poolOptions)
     }
 
