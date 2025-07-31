@@ -1,28 +1,23 @@
 package io.zeko.db.sql.connections
 
-import io.zeko.model.declarations.toMaps
-import io.vertx.core.json.JsonArray
-import io.vertx.ext.sql.SQLConnection
-import io.vertx.ext.sql.UpdateResult
-import io.vertx.kotlin.ext.sql.queryAwait
-import io.vertx.kotlin.ext.sql.queryWithParamsAwait
-import io.vertx.kotlin.ext.sql.updateWithParamsAwait
-import kotlinx.coroutines.delay
-import java.lang.Exception
-import java.util.LinkedHashMap
-import io.vertx.ext.sql.ResultSet
+import io.vertx.jdbcclient.JDBCPool
+import io.vertx.kotlin.coroutines.coAwait
+import io.vertx.sqlclient.Row
+import io.vertx.sqlclient.RowSet
+import io.vertx.sqlclient.SqlConnection
+import io.vertx.sqlclient.Tuple
 import io.zeko.db.sql.exceptions.DuplicateKeyException
 import io.zeko.db.sql.exceptions.throwDuplicate
-import java.sql.Date
-import java.sql.Time
-import java.sql.Timestamp
-import java.time.*
+import io.zeko.db.sql.utilities.convertParams
+import io.zeko.model.declarations.toDataObject
+import io.zeko.model.declarations.toMaps
+import kotlinx.coroutines.delay
 import java.net.ConnectException
 
 open class VertxDBSession : DBSession {
     protected var conn: DBConn
     protected var dbPool: DBPool
-    protected var rawConn: SQLConnection
+    protected var rawConn: SqlConnection
     protected var logger: DBLogger? = null
     protected var throwOnDuplicate = true
     protected var connErrorHandler: ((Throwable) -> Unit)? = null
@@ -30,13 +25,13 @@ open class VertxDBSession : DBSession {
     constructor(dbPool: DBPool, conn: DBConn) {
         this.dbPool = dbPool
         this.conn = conn
-        rawConn = conn.raw() as SQLConnection
+        rawConn = conn.raw() as SqlConnection
     }
 
     constructor(dbPool: DBPool, conn: DBConn, throwOnDuplicate: Boolean) {
         this.dbPool = dbPool
         this.conn = conn
-        rawConn = conn.raw() as SQLConnection
+        rawConn = conn.raw() as SqlConnection
         this.throwOnDuplicate = throwOnDuplicate
     }
 
@@ -44,7 +39,7 @@ open class VertxDBSession : DBSession {
 
     override fun connection(): DBConn = conn
 
-    override fun rawConnection(): SQLConnection = rawConn
+    override fun rawConnection(): SqlConnection = rawConn
 
     protected fun throwDuplicateException(err: Exception) {
         if (this.throwOnDuplicate) {
@@ -189,39 +184,18 @@ open class VertxDBSession : DBSession {
         return this.logger
     }
 
-    private fun convertParams(params: List<Any?>): JsonArray {
-        if (!params.isNullOrEmpty()) {
-            val converted = arrayListOf<Any?>()
-            //Vertx accepts Timestamp for date/time field
-            params.forEach { value ->
-                val v = when (value) {
-                    is LocalDate -> Date.valueOf(value)
-                    is LocalDateTime -> Timestamp.valueOf(value)
-                    is LocalTime -> Time.valueOf(value)
-                    is Instant -> Timestamp.valueOf(value.atZone(ZoneId.systemDefault()).toLocalDateTime())
-                    // if is zoned, stored in DB datetime field as the UTC date time,
-                    // when doing Entity prop type mapping with datetime_utc, it will be auto converted to ZonedDateTime with value in DB consider as UTC value
-                    is ZonedDateTime -> {
-                        val systemZoneDateTime = value.withZoneSameInstant(ZoneId.of("UTC"))
-                        val local = systemZoneDateTime.toLocalDateTime()
-                        Timestamp(ZonedDateTime.of(local, ZoneId.systemDefault()).toInstant().toEpochMilli())
-                    }
-                    else -> value
-                }
-                converted.add(v)
-            }
-            return JsonArray(converted)
-        }
-        return JsonArray(params)
-    }
-
     override suspend fun update(sql: String, params: List<Any?>, closeStatement: Boolean, closeConn: Boolean): Int {
-        var updateRes: UpdateResult?
+        var updateRes: RowSet<Row>? = null
         var affectedRows = 0
         try {
             logger?.logQuery(sql, params)
-            updateRes = rawConn.updateWithParamsAwait(sql, convertParams(params))
-            affectedRows = updateRes.updated
+            val stmt = rawConn.preparedQuery(sql)
+            if (params.isNotEmpty()) {
+                updateRes = stmt.execute(Tuple.from(convertParams(params).list)).coAwait()
+            } else {
+                updateRes = stmt.execute().coAwait()
+            }
+            affectedRows = updateRes.rowCount()
         } catch (err: java.sql.SQLFeatureNotSupportedException) {
             return affectedRows
         } catch (err: Exception) {
@@ -234,20 +208,18 @@ open class VertxDBSession : DBSession {
     }
 
     override suspend fun insert(sql: String, params: List<Any?>, closeStatement: Boolean, closeConn: Boolean): List<*> {
-        var updateRes: UpdateResult? = null
+        var updateRes: RowSet<Row>? = null
         try {
             logger?.logQuery(sql, params)
-            updateRes = rawConn.updateWithParamsAwait(sql, convertParams(params))
-            val affectedRows = updateRes.updated
-            if (affectedRows == 0) {
-                return listOf<Void>()
-            }
-            return updateRes.keys.toList()
+            val stmt = rawConn.preparedQuery(sql)
+            updateRes = stmt.execute(Tuple.from(convertParams(params).list)).coAwait()
+            val lastInsertId = updateRes.property(JDBCPool.GENERATED_KEYS)
+            return listOf(lastInsertId)
         } catch (err: java.sql.SQLFeatureNotSupportedException) {
             // Apache ignite insert will return this due to Auto generated keys are not supported.
             logger?.logUnsupportedSql(err)
             if (updateRes != null ) {
-                return updateRes.keys.toList()
+                return listOf(updateRes.property(JDBCPool.GENERATED_KEYS))
             }
         } catch (err: Exception) {
             throwDuplicateException(err)
@@ -262,25 +234,25 @@ open class VertxDBSession : DBSession {
 
     override suspend fun <T> queryPrepared(sql: String, params: List<Any?>, dataClassHandler: (dataMap: Map<String, Any?>) -> T, closeStatement: Boolean, closeConn: Boolean): List<T> {
         return executeQuery(sql, params) {
-            val res = rawConn.queryWithParamsAwait(sql, convertParams(params))
-            val rows = res.rows.map { jObj ->
-                val rowMap = jObj.map.mapKeys { it.key.toLowerCase() }
-                dataClassHandler(rowMap)
-            }
+            val stmt = rawConn.preparedQuery(sql)
+            val res = stmt.execute(Tuple.from(convertParams(params).list))
+            val rows = res.coAwait().toDataObject(dataClassHandler)
             if (closeConn) conn.close()
             rows
         }
     }
 
-    override suspend fun queryPrepared(sql: String, params: List<Any?>): ResultSet {
+    override suspend fun queryPrepared(sql: String, params: List<Any?>): RowSet<Row> {
         return executeQuery(sql, params) {
-            rawConn.queryWithParamsAwait(sql, convertParams(params))
+            val stmt = rawConn.preparedQuery(sql)
+            stmt.execute(Tuple.from(convertParams(params).list)).coAwait()
         }
     }
 
     override suspend fun queryPrepared(sql: String, params: List<Any?>, columns: List<String>, closeConn: Boolean): List<LinkedHashMap<String, Any?>> {
         return executeQuery(sql, params) {
-            val res = rawConn.queryWithParamsAwait(sql, convertParams(params))
+            val stmt = rawConn.preparedQuery(sql)
+            val res = stmt.execute(Tuple.from(convertParams(params).list)).coAwait()
             val rs = res.toMaps(columns)
             if (closeConn) conn.close()
             rs
@@ -289,26 +261,25 @@ open class VertxDBSession : DBSession {
 
     override suspend fun <T> query(sql: String, dataClassHandler: (dataMap: Map<String, Any?>) -> T, closeStatement: Boolean, closeConn: Boolean): List<T> {
         return executeQuery(sql, listOf()) {
-            val res = rawConn.queryAwait(sql)
-            val rows = res.rows.map { jObj ->
-                val rowMap = jObj.map.mapKeys { it.key.toLowerCase() }
-                dataClassHandler(rowMap)
-            }
+            val stmt = rawConn.query(sql)
+            val res = stmt.execute()
+            val rows = res.coAwait().toDataObject(dataClassHandler)
             if (closeConn) conn.close()
             rows
         }
     }
 
-    override suspend fun query(sql: String): ResultSet {
+    override suspend fun query(sql: String): RowSet<Row> {
         return executeQuery(sql, listOf()) {
-            rawConn.queryAwait(sql)
+            val stmt = rawConn.query(sql)
+            stmt.execute().coAwait()
         }
     }
 
     override suspend fun query(sql: String, columns: List<String>, closeConn: Boolean): List<LinkedHashMap<String, Any?>> {
         return executeQuery(sql, listOf()) {
-            val res = rawConn.queryAwait(sql)
-            val rs = res.toMaps(columns)
+            val stmt = rawConn.query(sql)
+            val rs = stmt.execute().coAwait().toMaps(columns)
             if (closeConn) conn.close()
             rs
         }

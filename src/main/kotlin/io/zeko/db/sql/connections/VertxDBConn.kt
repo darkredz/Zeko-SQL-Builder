@@ -1,34 +1,30 @@
 package io.zeko.db.sql.connections
 
-import io.vertx.ext.sql.SQLConnection
-import io.vertx.kotlin.ext.sql.closeAwait
-import io.vertx.kotlin.ext.sql.commitAwait
-import io.vertx.kotlin.ext.sql.rollbackAwait
-import io.vertx.kotlin.ext.sql.setAutoCommitAwait
+import io.vertx.kotlin.coroutines.coAwait
+import io.vertx.sqlclient.SqlConnection
 
-class VertxDBConn(val conn: SQLConnection) : DBConn {
+class VertxDBConn(val conn: SqlConnection) : DBConn {
 
     override suspend fun beginTx() {
-        conn.setAutoCommitAwait(false)
+        conn.begin().coAwait()
     }
 
     override suspend fun endTx() {
-        conn.setAutoCommitAwait(true)
     }
 
     override suspend fun commit() {
-        conn.commitAwait()
+        conn.transaction().commit().coAwait()
     }
 
     override suspend fun close() {
-        conn.closeAwait()
+        conn.close().coAwait()
     }
 
     override suspend fun rollback() {
-        conn.rollbackAwait()
+        conn.transaction().rollback()
     }
 
-    override fun raw(): SQLConnection {
+    override fun raw(): SqlConnection {
         return conn
     }
 }

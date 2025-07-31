@@ -2,11 +2,14 @@ package io.zeko.db.sql.connections
 
 import io.vertx.core.Vertx
 import io.vertx.core.json.JsonObject
-import io.vertx.ext.jdbc.JDBCClient
-import io.vertx.kotlin.ext.sql.getConnectionAwait
+import io.vertx.jdbcclient.JDBCConnectOptions
+import io.vertx.jdbcclient.JDBCPool
+import io.vertx.kotlin.coroutines.coAwait
+import io.vertx.sqlclient.Pool
+import io.vertx.sqlclient.PoolOptions
 
 class VertxDBPool : DBPool {
-    private lateinit var client: JDBCClient
+    private lateinit var pool: Pool
     private var vertx: Vertx
     private var insertStatementMode: Int = -1
 
@@ -16,11 +19,27 @@ class VertxDBPool : DBPool {
     }
 
     private fun init(config: JsonObject) {
-        client = JDBCClient.createShared(vertx, config)
+        val connectOptions = JDBCConnectOptions()
+        if (config.containsKey("jdbcUrl")) {
+            connectOptions.setJdbcUrl(config.getString("driverClassName"))
+        }
+        if (config.containsKey("database")) {
+            connectOptions.setDatabase(config.getString("database"))
+        }
+        if (config.containsKey("user")) {
+            connectOptions.setUser(config.getString("user"))
+        }
+        if (config.containsKey("password")) {
+            connectOptions.setPassword(config.getString("password"))
+        }
+
+        val poolOptions = PoolOptions()
+            .setMaxSize(16)
+        pool = JDBCPool.pool(vertx, connectOptions, poolOptions)
     }
 
     override suspend fun createConnection(): DBConn {
-        return VertxDBConn(client.getConnectionAwait())
+        return VertxDBConn(pool.connection.coAwait())
     }
 
     override fun getInsertStatementMode(): Int = insertStatementMode
