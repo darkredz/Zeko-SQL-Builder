@@ -214,7 +214,10 @@ open class VertxDBSession : DBSession {
             val stmt = rawConn.preparedQuery(sql)
             updateRes = stmt.execute(Tuple.from(convertParams(params).list)).coAwait()
             val lastInsertId = updateRes.property(JDBCPool.GENERATED_KEYS)
-            return listOf(lastInsertId)
+            if (lastInsertId == null || lastInsertId.size() == 0) {
+                return listOf<Void>()
+            }
+            return listOf(lastInsertId.getLong(0))
         } catch (err: java.sql.SQLFeatureNotSupportedException) {
             // Apache ignite insert will return this due to Auto generated keys are not supported.
             logger?.logUnsupportedSql(err)
