@@ -13,21 +13,79 @@ import java.nio.charset.Charset
 class JasyncDBPool : DBPool {
     private lateinit var client: ConnectionPool<*>
     private var insertStatementMode: Int = -1
+    private var config: JsonObject
 
     constructor(json: JsonObject) {
         init(json)
+        this.config = json
     }
 
     constructor(client: ConnectionPool<*>) {
         this.client = client
+        // TODO: Refactor
+        val cfg = client.configuration
+        this.config = JsonObject(
+            mapOf(
+                "host" to cfg.host,
+                "port" to cfg.port,
+                "database" to cfg.database,
+                "username" to cfg.username,
+                "password" to cfg.password,
+                "charset" to cfg.charset.name(),
+                "maxActiveConnections" to cfg.maxActiveConnections,
+                "maxIdleTime" to cfg.maxIdleTime,
+                "maxPendingQueries" to cfg.maxPendingQueries,
+                "maxConnectionTtl" to cfg.maxConnectionTtl,
+                "connectionCreateTimeout" to cfg.connectionCreateTimeout,
+                "connectionTestTimeout" to cfg.connectionTestTimeout,
+                "maximumMessageSize" to cfg.maximumMessageSize,
+                "queryTimeout" to cfg.queryTimeout
+            )
+        )
     }
 
     constructor(database: String, config: Configuration, poolConfig: ConnectionPoolConfiguration) {
         init(database, config, poolConfig)
+        this.config = JsonObject(
+            mapOf(
+                "host" to poolConfig.host,
+                "port" to poolConfig.port,
+                "database" to poolConfig.database,
+                "username" to poolConfig.username,
+                "password" to poolConfig.password,
+                "charset" to poolConfig.charset.name(),
+                "maxActiveConnections" to poolConfig.maxActiveConnections,
+                "maxIdleTime" to poolConfig.maxIdleTime,
+                "maxPendingQueries" to poolConfig.maxPendingQueries,
+                "maxConnectionTtl" to poolConfig.maxConnectionTtl,
+                "connectionCreateTimeout" to poolConfig.connectionCreateTimeout,
+                "connectionTestTimeout" to poolConfig.connectionTestTimeout,
+                "maximumMessageSize" to poolConfig.maximumMessageSize,
+                "queryTimeout" to poolConfig.queryTimeout
+            )
+        )
     }
 
     constructor(database: String, config: ConnectionPoolConfigurationBuilder) {
         init(database, config)
+        this.config = JsonObject(
+            mapOf(
+                "host" to config.host,
+                "port" to config.port,
+                "database" to config.database,
+                "username" to config.username,
+                "password" to config.password,
+                "charset" to config.charset.name(),
+                "maxActiveConnections" to config.maxActiveConnections,
+                "maxIdleTime" to config.maxIdleTime,
+                "maxPendingQueries" to config.maxPendingQueries,
+                "maxConnectionTtl" to config.maxConnectionTtl,
+                "connectionCreateTimeout" to config.connectionCreateTimeout,
+                "connectionTestTimeout" to config.connectionTestTimeout,
+                "maximumMessageSize" to config.maximumMessageSize,
+                "queryTimeout" to config.queryTimeout
+            )
+        )
     }
 
     private fun getConfigFromURL(url: String): Pair<String, ConnectionPoolConfigurationBuilder> {
@@ -153,4 +211,6 @@ class JasyncDBPool : DBPool {
     override fun setInsertStatementMode(mode: Int) {
         insertStatementMode = mode
     }
+
+    override fun getConfig(): JsonObject = config
 }

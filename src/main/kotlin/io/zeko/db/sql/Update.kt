@@ -5,11 +5,13 @@ import io.zeko.model.Entity
 
 open class Update : DataManipulation {
     protected var where: Query? = null
+    private var useAlterTableUpdate: Boolean = false
 
-    constructor(entity: Entity, parameterize: Boolean = false, espTableName: Boolean = false) {
+    constructor(entity: Entity, parameterize: Boolean = false, espTableName: Boolean = false, useAlterTableUpdate: Boolean = false) {
         this.entity = entity
         this.parameterize = parameterize
         this.espTableName = espTableName
+        this.useAlterTableUpdate = useAlterTableUpdate
     }
 
     override fun escapeTable(espTableName: Boolean): Update {
@@ -27,8 +29,17 @@ open class Update : DataManipulation {
         return this
     }
 
+    fun setUseAlterTableUpdate(use: Boolean): Update {
+        this.useAlterTableUpdate = use
+        return this
+    }
+
     override fun toSql(): String {
-        var sql = "UPDATE ${getTableName()} SET "
+        var sql = if (useAlterTableUpdate) {
+            "ALTER TABLE ${getTableName()} UPDATE "
+        } else {
+            "UPDATE ${getTableName()} SET "
+        }
 
         if (entity.dataMap().isNotEmpty()) {
             val entries = entity.dataMap().entries

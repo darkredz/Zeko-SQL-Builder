@@ -7,13 +7,28 @@ import io.vertx.core.json.JsonObject
 class HikariDBPool : DBPool {
     private lateinit var ds: HikariDataSource
     private var insertStatementMode: Int = -1
+    private var config: JsonObject
 
     constructor(json: JsonObject) {
         init(json)
+        this.config = json
     }
 
     constructor(config: HikariConfig) {
         init(config)
+        // TODO: Refactor
+        this.config = JsonObject(
+            mapOf(
+                "driverClassName" to config.driverClassName,
+                "jdbcUrl" to config.jdbcUrl,
+                "username" to config.username,
+                "password" to config.password,
+                "max_pool_size" to config.maximumPoolSize,
+                "initial_pool_size" to config.minimumIdle,
+                "max_idle_time" to config.maxLifetime,
+                "aliveBypassWindowMs" to config.connectionTimeout
+            )
+        )
     }
 
     private fun init(config: JsonObject) {
@@ -58,5 +73,7 @@ class HikariDBPool : DBPool {
     override fun setInsertStatementMode(mode: Int) {
         insertStatementMode = mode
     }
+
+    override fun getConfig(): JsonObject = config
 }
 

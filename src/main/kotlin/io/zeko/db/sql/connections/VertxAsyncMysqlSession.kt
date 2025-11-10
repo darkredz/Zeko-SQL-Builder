@@ -14,6 +14,7 @@ import io.vertx.sqlclient.Tuple
 import io.zeko.db.sql.exceptions.DuplicateKeyException
 import io.zeko.db.sql.exceptions.throwDuplicate
 import io.zeko.db.sql.utilities.convertParams
+import io.zeko.model.Entity
 import io.zeko.model.declarations.toDataObject
 import io.zeko.model.declarations.toMaps
 import kotlinx.coroutines.GlobalScope
@@ -63,8 +64,7 @@ open class VertxAsyncMysqlSession : DBSession {
         }
     }
 
-    // TODO: Add set conn error handler to interface class
-    fun setConnErrorHandler(handler: suspend (Throwable, DBErrorCode, DBSession) -> Boolean): DBSession {
+    override fun setConnErrorHandler(handler: suspend (Throwable, DBErrorCode, DBSession) -> Boolean): DBSession {
         this.connErrorHandler = handler
         return this
     }
@@ -74,13 +74,13 @@ open class VertxAsyncMysqlSession : DBSession {
         return this
     }
 
-    fun reinit(dbPool: DBPool, conn: DBConn) {
+    override fun reinit(dbPool: DBPool, conn: DBConn) {
         this.dbPool = dbPool
         this.conn = conn
         rawConn = (dbPool as VertxAsyncMysqlPool).getClient()
     }
 
-    private fun checkIsConnError (err: Throwable): DBErrorCode? {
+    override fun checkIsConnError (err: Throwable): DBErrorCode? {
         logger?.logError(err)
         logger?.log("isClosedConnectionException: ${err is ClosedConnectionException}")
 
@@ -363,6 +363,11 @@ open class VertxAsyncMysqlSession : DBSession {
         } finally {
             if (closeConn) conn.close()
         }
+    }
+
+    override suspend fun insert(tableName: String, records: List<Entity>, closeConn: Boolean): List<*> {
+        // TODO: Implement
+        return emptyList<String>()
     }
 
     override suspend fun <T> queryPrepared(sql: String, params: List<Any?>, dataClassHandler: (dataMap: Map<String, Any?>) -> T, closeStatement: Boolean, closeConn: Boolean): List<T> {

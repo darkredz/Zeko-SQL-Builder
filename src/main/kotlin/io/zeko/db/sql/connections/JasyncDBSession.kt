@@ -5,9 +5,11 @@ import com.github.jasync.sql.db.pool.ConnectionPool
 import com.github.jasync.sql.db.mysql.MySQLQueryResult
 import io.zeko.db.sql.exceptions.DuplicateKeyException
 import io.zeko.db.sql.exceptions.throwDuplicate
+import io.zeko.model.Entity
 import io.zeko.model.declarations.toMaps
 import kotlinx.coroutines.delay
 import java.lang.Exception
+import java.sql.Connection
 import java.time.*
 import java.util.LinkedHashMap
 
@@ -17,6 +19,7 @@ open class JasyncDBSession : DBSession {
     protected var rawConn: Any
     protected var logger: DBLogger? = null
     protected var throwOnDuplicate = true
+    protected var connErrorHandler: (suspend (Throwable, DBErrorCode, DBSession) -> Boolean)? = null
 
     constructor(dbPool: DBPool, conn: DBConn) {
         this.dbPool = dbPool
@@ -36,6 +39,22 @@ open class JasyncDBSession : DBSession {
     override fun connection(): DBConn = conn
 
     override fun rawConnection(): ConnectionPool<*> = rawConn as ConnectionPool<*>
+
+    override fun setConnErrorHandler(handler: suspend (Throwable, DBErrorCode, DBSession) -> Boolean): DBSession {
+        this.connErrorHandler = handler
+        return this
+    }
+
+    override fun checkIsConnError (err: Throwable): DBErrorCode? {
+        // TODO: Implement specific error code checks for Jasync
+        return null
+    }
+
+    override fun reinit(dbPool: DBPool, conn: DBConn) {
+        this.dbPool = dbPool
+        this.conn = conn
+        rawConn = conn.raw() as Connection
+    }
 
     override suspend fun close() {
         conn.close()
@@ -127,6 +146,11 @@ open class JasyncDBSession : DBSession {
             if (closeConn) conn.close()
         }
         return listOf<Void>()
+    }
+
+    override suspend fun insert(tableName: String, records: List<Entity>, closeConn: Boolean): List<*> {
+        // TODO: Implement
+        return emptyList<String>()
     }
 
     override suspend fun <T> queryPrepared(sql: String, params: List<Any?>, dataClassHandler: (dataMap: Map<String, Any?>) -> T, closeStatement: Boolean, closeConn: Boolean): List<T> {

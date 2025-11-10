@@ -60,7 +60,14 @@ abstract class Entity {
             Type.BOOL -> when (value) {
                 is Boolean -> value
                 is Byte -> value.toInt() > 0
+                is Short -> value.toInt() > 0
                 else -> false
+            }
+            Type.BIGINT -> when (value) {
+                is String -> value.toBigInteger()
+                is Int -> value.toBigInteger()
+                is Long -> value.toBigInteger()
+                else -> value
             }
             Type.INT -> when (value) {
                 is Int -> value
@@ -90,6 +97,14 @@ abstract class Entity {
                 is Byte -> value.toLong()
                 else -> value
             }
+            Type.BIGDEC -> when (value) {
+                is String -> value.toBigDecimal()
+                is Double -> value.toBigDecimal()
+                is Float -> value.toBigDecimal()
+                is Int -> value.toBigDecimal()
+                is Long -> value.toBigDecimal()
+                else -> value
+            }
             Type.DATETIME -> {
                 if (value !is String) {
                     val dateStr = value.toString()
@@ -117,7 +132,15 @@ abstract class Entity {
                 if (value is java.util.Date) {
                     value.toInstant().atZone(ZoneId.systemDefault()).toLocalDate()
                 } else {
-                    LocalDate.parse(value.toString())
+                    val value = value.toString()
+                    // Handle different date string formats
+                    when {
+                        value.contains("T") || value.contains("+") || value.contains("[") -> {
+                            // Parse as ZonedDateTime first, then extract date
+                            ZonedDateTime.parse(value).toLocalDate()
+                        }
+                        else -> LocalDate.parse(value)
+                    }
                 }
             }
             Type.ZONEDATETIME_UTC -> {
@@ -143,6 +166,9 @@ abstract class Entity {
     fun repeatMs(dateStr: String) = "S".repeat(dateStr.split(".").last().takeWhile { !it.isLetter() }.length)
 
     fun convertZoneDateTime(value: Any, useSystem: Boolean = false): ZonedDateTime {
+        if (value is ZonedDateTime) {
+            return value
+        }
         if (value !is String) {
             val dateStr = value.toString()
             var patternStr = ""
@@ -173,6 +199,13 @@ abstract class Entity {
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.${repeatMs(value)}z")
         } else {
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")
+        }
+
+        // Clickhouse return UTC "2025-10-22 02:51:21.269"
+        if (value.indexOf('T') == -1 && value.indexOf('Z') == -1 && value.indexOf('+') == -1) {
+            val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.${repeatMs(value)}")
+            val localDateTime = LocalDateTime.parse(value, formatter)
+            return localDateTime.atZone(ZoneOffset.UTC)
         }
 
         val systemZoneDateTime = ZonedDateTime.parse(value, pattern).withZoneSameInstant(ZoneId.systemDefault())

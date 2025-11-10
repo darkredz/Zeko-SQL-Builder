@@ -19,7 +19,6 @@ class VertxAsyncMysqlPool : DBPool {
         init(json)
     }
 
-    fun getConfig(): JsonObject = config
     fun getVertx(): Vertx = vertx
     fun getClient(): Pool = client
 
@@ -58,4 +57,6 @@ class VertxAsyncMysqlPool : DBPool {
     override fun setInsertStatementMode(mode: Int) {
         insertStatementMode = mode
     }
+
+    override fun getConfig(): JsonObject = config
 }

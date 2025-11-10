@@ -14,9 +14,11 @@ class VertxDBPool : DBPool {
     private lateinit var pool: Pool
     private var vertx: Vertx
     private var insertStatementMode: Int = -1
+    private var config: JsonObject
 
     constructor(vertx: Vertx, json: JsonObject) {
         this.vertx = vertx
+        this.config = json
         init(json)
     }
 
@@ -62,4 +64,6 @@ class VertxDBPool : DBPool {
     override fun setInsertStatementMode(mode: Int) {
         insertStatementMode = mode
     }
+
+    override fun getConfig(): JsonObject = config
 }

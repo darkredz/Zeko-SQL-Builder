@@ -2,6 +2,7 @@ package io.zeko.db.sql.connections
 
 import io.zeko.db.sql.exceptions.DuplicateKeyException
 import io.zeko.db.sql.exceptions.throwDuplicate
+import io.zeko.model.Entity
 import io.zeko.model.declarations.toMaps
 import kotlinx.coroutines.delay
 import org.joda.time.LocalDateTime
@@ -25,6 +26,7 @@ open class HikariDBSession : DBSession {
     protected var rawConn: Connection
     protected var logger: DBLogger? = null
     protected var throwOnDuplicate = true
+    protected var connErrorHandler: (suspend (Throwable, DBErrorCode, DBSession) -> Boolean)? = null
 
     constructor(dbPool: DBPool, conn: DBConn) {
         this.dbPool = dbPool
@@ -45,10 +47,26 @@ open class HikariDBSession : DBSession {
 
     override fun rawConnection(): Connection = rawConn
 
+    override fun setConnErrorHandler(handler: suspend (Throwable, DBErrorCode, DBSession) -> Boolean): DBSession {
+        this.connErrorHandler = handler
+        return this
+    }
+
+    override fun checkIsConnError (err: Throwable): DBErrorCode? {
+        // TODO: Implement specific error code checks for Hikari
+        return null
+    }
+
     protected fun throwDuplicateException(err: Exception) {
         if (this.throwOnDuplicate) {
             throwDuplicate(err)
         }
+    }
+
+    override fun reinit(dbPool: DBPool, conn: DBConn) {
+        this.dbPool = dbPool
+        this.conn = conn
+        rawConn = conn.raw() as Connection
     }
 
     override suspend fun <A> once(operation: suspend (DBSession) -> A): A {
@@ -267,6 +285,11 @@ open class HikariDBSession : DBSession {
             if (closeConn) conn.close()
         }
         return listOf<Void>()
+    }
+
+    override suspend fun insert(tableName: String, records: List<Entity>, closeConn: Boolean): List<*> {
+        // TODO: Implement
+        return emptyList<String>()
     }
 
     override suspend fun <T> queryPrepared(sql: String, params: List<Any?>, dataClassHandler: (dataMap: Map<String, Any?>) -> T, closeStatement: Boolean, closeConn: Boolean): List<T> {

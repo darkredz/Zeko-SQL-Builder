@@ -9,10 +9,12 @@ import io.vertx.sqlclient.Tuple
 import io.zeko.db.sql.exceptions.DuplicateKeyException
 import io.zeko.db.sql.exceptions.throwDuplicate
 import io.zeko.db.sql.utilities.convertParams
+import io.zeko.model.Entity
 import io.zeko.model.declarations.toDataObject
 import io.zeko.model.declarations.toMaps
 import kotlinx.coroutines.delay
 import java.net.ConnectException
+import java.sql.Connection
 
 open class VertxDBSession : DBSession {
     protected var conn: DBConn
@@ -20,7 +22,7 @@ open class VertxDBSession : DBSession {
     protected var rawConn: SqlConnection
     protected var logger: DBLogger? = null
     protected var throwOnDuplicate = true
-    protected var connErrorHandler: ((Throwable) -> Unit)? = null
+    protected var connErrorHandler: (suspend (Throwable, DBErrorCode, DBSession) -> Boolean)? = null
 
     constructor(dbPool: DBPool, conn: DBConn) {
         this.dbPool = dbPool
@@ -41,6 +43,22 @@ open class VertxDBSession : DBSession {
 
     override fun rawConnection(): SqlConnection = rawConn
 
+    override fun setConnErrorHandler(handler: suspend (Throwable, DBErrorCode, DBSession) -> Boolean): DBSession {
+        this.connErrorHandler = handler
+        return this
+    }
+
+    override fun checkIsConnError (err: Throwable): DBErrorCode? {
+        // TODO: Implement specific error code checks for Vert.x SQL client
+        return null
+    }
+
+    override fun reinit(dbPool: DBPool, conn: DBConn) {
+        this.dbPool = dbPool
+        this.conn = conn
+        rawConn = conn.raw() as SqlConnection
+    }
+
     protected fun throwDuplicateException(err: Exception) {
         if (this.throwOnDuplicate) {
             throwDuplicate(err)
@@ -56,8 +74,14 @@ open class VertxDBSession : DBSession {
             logger?.logQuery(sql, params)
             return operation()
         } catch (err: Exception) {
-            if (err is ConnectException && connErrorHandler != null) {
-                connErrorHandler?.invoke(err)
+            val errorCode = checkIsConnError(err)
+            if (errorCode != null && connErrorHandler != null) {
+                val toRetry = connErrorHandler?.invoke(err, errorCode, this)
+                if (toRetry == true) {
+                    return operation()
+                } else {
+                    throw err
+                }
             }
             throw err
         }
@@ -169,12 +193,6 @@ open class VertxDBSession : DBSession {
         conn.close()
     }
 
-    // TODO: Add set conn error handler to interface class
-    fun setConnErrorHandler(handler: (Throwable) -> Unit): DBSession {
-        this.connErrorHandler = handler
-        return this
-    }
-
     override fun setQueryLogger(logger: DBLogger): DBSession {
         this.logger = logger
         return this
@@ -233,7 +251,10 @@ open class VertxDBSession : DBSession {
         return listOf<Void>()
     }
 
-
+    override suspend fun insert(tableName: String, records: List<Entity>, closeConn: Boolean): List<*> {
+        // TODO: Implement
+        return emptyList<String>()
+    }
 
     override suspend fun <T> queryPrepared(sql: String, params: List<Any?>, dataClassHandler: (dataMap: Map<String, Any?>) -> T, closeStatement: Boolean, closeConn: Boolean): List<T> {
         return executeQuery(sql, params) {
