@@ -80,7 +80,7 @@
 
     <properties>
         <kotlin.version>1.6.20</kotlin.version>
-        <vertx.version>4.1.1</vertx.version>
+        <vertx.version>4.5.24</vertx.version>
         <spek.version>2.0.9</spek.version>
         <jupiter.version>5.2.0</jupiter.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
